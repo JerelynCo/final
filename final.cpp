@@ -1,6 +1,6 @@
 /*
 Compiled via command line using:
-	g++ ballHell.cpp -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -o ballHell
+	g++ ballHell.cpp -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -o final
 */
 
 //Using SDL, SDL_image, standard IO, vectors, and strings
@@ -125,6 +125,7 @@ class Player{
 		Circle& getCollider();
 
         void shiftColliders();
+		
     private:
 		//The X and Y offsets of the player
 		int mPosX, mPosY;
@@ -140,13 +141,23 @@ class Player{
 
 };
 
+class Map{
+	public:
+		static const int TILE_WIDTH = 25;
+		static const int TILE_HEIGHT = 25;
+		
+		static const int TILE_COLS = SCREEN_HEIGHT/TILE_WIDTH;
+		static const int TILE_ROWS = SCREEN_WIDTH/TILE_HEIGHT;
+		
+		void load();
+};
+
 /*class Powers{
 	public:
 
 	private:
 
 };*/
-
 
 //Starts up SDL and creates window
 bool init();
@@ -157,11 +168,11 @@ bool loadMedia();
 //Frees media and shuts down SDL
 void close();
 
-//The window we'll be rendering to
-SDL_Window* gWindow = NULL;
-
 //The window renderer
 SDL_Renderer* gRenderer = NULL;
+
+//The window we'll be rendering to
+SDL_Window* gWindow = NULL;
 
 //Globally used font
 TTF_Font* gFont = NULL;
@@ -205,7 +216,7 @@ int main(int argc, char *args[]){
 			gPlayers.push_back(playerOne);
 			Player playerTwo(1);
 			gPlayers.push_back(playerTwo);
-
+			
 			//Event handler
 			SDL_Event e;
 
@@ -217,6 +228,8 @@ int main(int argc, char *args[]){
 
 			//start global game timer
 			gTimer.start();
+			
+			Map map;
 			
 			//While application is running
 			while(!quit){									
@@ -257,6 +270,9 @@ int main(int argc, char *args[]){
 					SDL_SetRenderDrawColor(gRenderer, 0xB4, 0xB4, 0xB4, 0xFF);
 					SDL_RenderClear(gRenderer);
 					
+					SDL_SetRenderDrawColor(gRenderer, 0xFF, 0x00, 0x00, 0xFF);
+					map.load();
+					
 					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth()) - 50, 0);
 					gBombTexture.render(50,200);
 					gShieldTexture.render(10,200);
@@ -274,6 +290,7 @@ int main(int argc, char *args[]){
 					gPauseTextTexture.render((SCREEN_WIDTH-gPauseTextTexture.getWidth())/2, (SCREEN_HEIGHT-gPauseTextTexture.getHeight())/2);
 
 				}
+				
 				//Update screen
 				SDL_RenderPresent(gRenderer);
 			}
@@ -601,6 +618,20 @@ void Player::render(){
 		gPlayerTwoTexture.render(mPosX, mPosY);
 	}
 
+}
+
+void Map::load(){
+	SDL_Rect tile = {0, 0, Map::TILE_WIDTH, Map::TILE_HEIGHT};
+	
+	for(int i = 0; i < Map::TILE_COLS; ++i){
+		for(int j = 0; j < Map::TILE_ROWS; ++j){
+			SDL_RenderDrawRect(gRenderer, &tile);
+			tile.x += tile.h;
+		}
+		
+		tile.x = 0;
+		tile.y += tile.w;
+	}
 }
 
 bool init(){

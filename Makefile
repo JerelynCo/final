@@ -1,14 +1,14 @@
 #--Source code--
-OBJ = final.cpp
+OBJ = Final.cpp
 
 #--Compiler used--
 CC = g++
 
 #--Libraries we're linking against.--
-LIBRARY_LINKS = -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf
+LIBRARY_LINKS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf
 
 #--Name of our exectuable--
-OBJ_NAME = final
+OBJ_NAME = Final
 
 #--This is the target that compiles our executable--
 all : $(OBJS)  
