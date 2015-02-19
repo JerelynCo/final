@@ -7,23 +7,18 @@ Compiled via command line using:
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <cmath>
 #include <cstdio>
+#include <random>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <cmath>
-#include <sstream>
 
 #define PI 3.14159265
 
 //Screen dimension constants
-const int SCREEN_WIDTH = 1200;
-const int SCREEN_HEIGHT = 600;
-
-//circle struct
-struct Circle{
-    int x, y;
-    int r;
-};
+const int SCREEN_WIDTH = 1225;
+const int SCREEN_LENGTH = 625;
 
 //Texture wrapper class
 class LTexture{
@@ -101,14 +96,42 @@ class LTimer{
 		bool mStarted;
 };
 
+struct Tile{
+		static const int LENGTH = 25, WIDTH = 25;
+		static const int ROWS = SCREEN_LENGTH/LENGTH;
+		static const int COLS = SCREEN_WIDTH/WIDTH;
+
+		const Uint8 r, g, b;
+		const Uint8 m, v;
+		
+		Tile(Uint8 red, Uint8 green, Uint8 blue, Uint8 mobility, Uint8 vulnerability):
+			r(red), g(green), b(blue),
+			m(mobility), v(vulnerability) {};
+};
+
+class Map{
+		int tileMap[Tile::COLS][Tile::ROWS];
+	public:
+		Map();
+		Tile* getTile(int, int);
+		void render();
+};
+
+//Circle struct
+struct Circle{
+    int x, y;
+    int r;
+};
+
+//Player class
 class Player{
 	public:
 		//The dimensions of the player
 		static const int PLAYER_WIDTH = 20;
-		static const int PLAYER_HEIGHT = 20;
+		static const int PLAYER_LENGTH = 20;
 
 		//Maximum axis velocity of the player
-		static const int PLAYER_VEL = 10;
+		static const int PLAYER_VEL = 2;
 
 		//Initializes the variables
 		Player(int ID);
@@ -117,7 +140,7 @@ class Player{
 		void handleEvent(SDL_Event& e);
 
 		//Moves the player
-		void move();
+		void move(Map*);
 
 		//Shows the player on the screen
 		void render();
@@ -139,17 +162,6 @@ class Player{
 		//the collider for the circle
         Circle mCollider;
 
-};
-
-class Map{
-	public:
-		static const int TILE_WIDTH = 25;
-		static const int TILE_HEIGHT = 25;
-		
-		static const int TILE_COLS = SCREEN_HEIGHT/TILE_WIDTH;
-		static const int TILE_ROWS = SCREEN_WIDTH/TILE_HEIGHT;
-		
-		void load();
 };
 
 /*class Powers{
@@ -188,12 +200,18 @@ LTexture gLifeTexture;
 LTexture gTimeTextTexture;
 LTexture gPauseTextTexture;
 
-
 ///Vectors for Players
 std::vector<Player> gPlayers;
 
 //Global timer
 LTimer gTimer;
+
+Tile grass(0x00, 0xFF, 0x00, 1, 0);
+Tile brick(0xFF, 0x00, 0x00, 0, 1);
+Tile water(0x00, 0x00, 0xFF, 0, 2);
+Tile steel(0x00, 0x00, 0x00, 0, 2);
+
+Tile tile[] = {grass, brick, water, steel};
 
 int main(int argc, char *args[]){	
 	gTimer.start();
@@ -270,8 +288,7 @@ int main(int argc, char *args[]){
 					SDL_SetRenderDrawColor(gRenderer, 0xB4, 0xB4, 0xB4, 0xFF);
 					SDL_RenderClear(gRenderer);
 					
-					SDL_SetRenderDrawColor(gRenderer, 0xFF, 0x00, 0x00, 0xFF);
-					map.load();
+					map.render();
 					
 					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth()) - 50, 0);
 					gBombTexture.render(50,200);
@@ -279,7 +296,7 @@ int main(int argc, char *args[]){
 					gLifeTexture.render(100,200);
 
 					for(int i = 0; i < gPlayers.size(); i++){
-						gPlayers[i].move();
+						gPlayers[i].move(&map);
 						gPlayers[i].render();
 					}
 				}
@@ -287,7 +304,7 @@ int main(int argc, char *args[]){
 				else{
 					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 					SDL_RenderClear(gRenderer);
-					gPauseTextTexture.render((SCREEN_WIDTH-gPauseTextTexture.getWidth())/2, (SCREEN_HEIGHT-gPauseTextTexture.getHeight())/2);
+					gPauseTextTexture.render((SCREEN_WIDTH-gPauseTextTexture.getWidth())/2, (SCREEN_LENGTH-gPauseTextTexture.getHeight())/2);
 
 				}
 				
@@ -515,8 +532,7 @@ bool LTimer::isPaused(){
 	return mPaused && mStarted;
 }
 
-Player::Player(int ID)
-{
+Player::Player(int ID){
     //Initialize the offsets
     mPosX = 0;
     mPosY = 0;
@@ -576,13 +592,15 @@ void Player::handleEvent(SDL_Event& e){
     }
 }
 
-void Player::move()
-{
+void Player::move(Map* map){
     //Move the Player left or right
     mPosX += mVelX;
     shiftColliders();
+	
     //If the Player went too far to the left or right
-    if((mPosX < 0) || (mPosX + PLAYER_WIDTH > SCREEN_WIDTH)){
+    if((mPosX < 0) || (mPosX + PLAYER_WIDTH > SCREEN_WIDTH)
+		|| ((map->getTile(mPosX, mPosY))->m <= 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m <= 0)
+		|| ((map->getTile(mPosX, mPosY+PLAYER_LENGTH))->m <= 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m <= 0)){
         //Move back
         mPosX -= mVelX;
         shiftColliders();
@@ -592,7 +610,9 @@ void Player::move()
     mPosY += mVelY;
     shiftColliders();
     //If the Player went too far up or down
-    if((mPosY < 0)||(mPosY + PLAYER_HEIGHT > SCREEN_HEIGHT)){
+    if((mPosY < 0)||(mPosY + PLAYER_LENGTH > SCREEN_LENGTH)
+		|| ((map->getTile(mPosX, mPosY))->m <= 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m <= 0)
+		|| ((map->getTile(mPosX, mPosY+PLAYER_LENGTH))->m <= 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m <= 0)){
         //Move back
         mPosY -= mVelY;
         shiftColliders();
@@ -620,17 +640,44 @@ void Player::render(){
 
 }
 
-void Map::load(){
-	SDL_Rect tile = {0, 0, Map::TILE_WIDTH, Map::TILE_HEIGHT};
+Map::Map(){
+	static std::random_device tileType;
 	
-	for(int i = 0; i < Map::TILE_COLS; ++i){
-		for(int j = 0; j < Map::TILE_ROWS; ++j){
-			SDL_RenderDrawRect(gRenderer, &tile);
-			tile.x += tile.h;
+	for(int i = 0; i < Tile::ROWS; ++i){
+		for(int j = 0; j < Tile::COLS; ++j){
+			if(i%2 == 0 || j%2 == 0){
+				if((i == 0 && j == 0)
+					|| (i == 0 && j == Tile::COLS-1)
+					|| (i == Tile::ROWS-1 && j == 0)
+					|| (i == Tile::ROWS-1 && j == Tile::COLS-1)){
+					tileMap[j][i] = 0;
+				}else{
+					tileMap[j][i] = tileType()%2;
+				}
+			}else{
+				tileMap[j][i] = tileType()%2+2;
+			}
+		}
+	}
+}
+
+Tile* Map::getTile(int x, int y){
+	return &(tile[tileMap[x/Tile::WIDTH][y/Tile::LENGTH]]);
+}
+
+void Map::render(){
+	SDL_Rect space = {0, 0, Tile::WIDTH, Tile::LENGTH};
+	
+	for(int i = 0; i < Tile::ROWS; ++i){
+		for(int j = 0; j < Tile::COLS; ++j){
+			SDL_SetRenderDrawColor(gRenderer, tile[tileMap[j][i]].r, tile[tileMap[j][i]].g, tile[tileMap[j][i]].b, 0);
+			SDL_RenderFillRect(gRenderer, &space);
+			
+			space.x += space.w;
 		}
 		
-		tile.x = 0;
-		tile.y += tile.w;
+		space.x = 0;
+		space.y += space.h;
 	}
 }
 
@@ -649,7 +696,7 @@ bool init(){
 		}
 		
 		//Create window
-		gWindow = SDL_CreateWindow("Project", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+		gWindow = SDL_CreateWindow("Project", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_LENGTH, SDL_WINDOW_SHOWN);
 		if(gWindow == NULL){
 			printf("Window could not be created! SDL Error: %s\n", SDL_GetError());
 			success = false;
