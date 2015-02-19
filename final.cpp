@@ -20,6 +20,13 @@ Compiled via command line using:
 const int SCREEN_WIDTH = 1225;
 const int SCREEN_LENGTH = 625;
 
+enum Terrain{
+	GRASS,
+	BRICK,
+	WATER,
+	EMPTY
+};
+
 //Texture wrapper class
 class LTexture{
 	public:
@@ -98,15 +105,13 @@ class LTimer{
 
 struct Tile{
 		static const int LENGTH = 25, WIDTH = 25;
-		static const int ROWS = SCREEN_LENGTH/LENGTH;
-		static const int COLS = SCREEN_WIDTH/WIDTH;
+		static const int ROWS = SCREEN_LENGTH/LENGTH, COLS = SCREEN_WIDTH/WIDTH;
 
-		const Uint8 r, g, b;
+		SDL_Rect t;
 		const Uint8 m, v;
 		
-		Tile(Uint8 red, Uint8 green, Uint8 blue, Uint8 mobility, Uint8 vulnerability):
-			r(red), g(green), b(blue),
-			m(mobility), v(vulnerability) {};
+		Tile(SDL_Rect tile, Uint8 mobility, Uint8 vulnerability):
+			t(tile), m(mobility), v(vulnerability) {};
 };
 
 class Map{
@@ -127,9 +132,8 @@ struct Circle{
 class Player{
 	public:
 		//The dimensions of the player
-		static const int PLAYER_WIDTH = 20;
-		static const int PLAYER_LENGTH = 20;
-
+		static const int PLAYER_WIDTH = 20, PLAYER_LENGTH = 20;
+		
 		//Maximum axis velocity of the player
 		static const int PLAYER_VEL = 2;
 
@@ -206,12 +210,9 @@ std::vector<Player> gPlayers;
 //Global timer
 LTimer gTimer;
 
-Tile grass(0x00, 0xFF, 0x00, 1, 0);
-Tile brick(0xFF, 0x00, 0x00, 0, 1);
-Tile water(0x00, 0x00, 0xFF, 0, 2);
-Tile steel(0x00, 0x00, 0x00, 0, 2);
+LTexture gTerrainSheet;
 
-Tile tile[] = {grass, brick, water, steel};
+Tile* tile[4];
 
 int main(int argc, char *args[]){	
 	gTimer.start();
@@ -532,6 +533,39 @@ bool LTimer::isPaused(){
 	return mPaused && mStarted;
 }
 
+Map::Map(){
+	static std::random_device tileType;
+	
+	for(int i = 0; i < Tile::ROWS; ++i){
+		for(int j = 0; j < Tile::COLS; ++j){
+			if(i%2 == 0 || j%2 == 0){
+				if((i == 0 && j == 0)
+					|| (i == 0 && j == Tile::COLS-1)
+					|| (i == Tile::ROWS-1 && j == 0)
+					|| (i == Tile::ROWS-1 && j == Tile::COLS-1)){
+					tileMap[j][i] = 0;
+				}else{
+					tileMap[j][i] = tileType()%2;
+				}
+			}else{
+				tileMap[j][i] = tileType()%2+2;
+			}
+		}
+	}
+}
+
+Tile* Map::getTile(int x, int y){
+	return tile[tileMap[x/Tile::WIDTH][y/Tile::LENGTH]];
+}
+
+void Map::render(){
+	for(int i = 0; i < Tile::ROWS; ++i){
+		for(int j = 0; j < Tile::COLS; ++j){
+			gTerrainSheet.render(j*Tile::WIDTH, i*Tile::LENGTH, &(tile[tileMap[j][i]]->t));
+		}
+	}
+}
+
 Player::Player(int ID){
     //Initialize the offsets
     mPosX = 0;
@@ -599,8 +633,8 @@ void Player::move(Map* map){
 	
     //If the Player went too far to the left or right
     if((mPosX < 0) || (mPosX + PLAYER_WIDTH > SCREEN_WIDTH)
-		|| ((map->getTile(mPosX, mPosY))->m <= 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m <= 0)
-		|| ((map->getTile(mPosX, mPosY+PLAYER_LENGTH))->m <= 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m <= 0)){
+		|| ((map->getTile(mPosX, mPosY))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m > 0)
+		|| ((map->getTile(mPosX, mPosY+PLAYER_LENGTH))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m > 0)){
         //Move back
         mPosX -= mVelX;
         shiftColliders();
@@ -611,8 +645,8 @@ void Player::move(Map* map){
     shiftColliders();
     //If the Player went too far up or down
     if((mPosY < 0)||(mPosY + PLAYER_LENGTH > SCREEN_LENGTH)
-		|| ((map->getTile(mPosX, mPosY))->m <= 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m <= 0)
-		|| ((map->getTile(mPosX, mPosY+PLAYER_LENGTH))->m <= 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m <= 0)){
+		|| ((map->getTile(mPosX, mPosY))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m > 0)
+		|| ((map->getTile(mPosX, mPosY+PLAYER_LENGTH))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m > 0)){
         //Move back
         mPosY -= mVelY;
         shiftColliders();
@@ -638,47 +672,6 @@ void Player::render(){
 		gPlayerTwoTexture.render(mPosX, mPosY);
 	}
 
-}
-
-Map::Map(){
-	static std::random_device tileType;
-	
-	for(int i = 0; i < Tile::ROWS; ++i){
-		for(int j = 0; j < Tile::COLS; ++j){
-			if(i%2 == 0 || j%2 == 0){
-				if((i == 0 && j == 0)
-					|| (i == 0 && j == Tile::COLS-1)
-					|| (i == Tile::ROWS-1 && j == 0)
-					|| (i == Tile::ROWS-1 && j == Tile::COLS-1)){
-					tileMap[j][i] = 0;
-				}else{
-					tileMap[j][i] = tileType()%2;
-				}
-			}else{
-				tileMap[j][i] = tileType()%2+2;
-			}
-		}
-	}
-}
-
-Tile* Map::getTile(int x, int y){
-	return &(tile[tileMap[x/Tile::WIDTH][y/Tile::LENGTH]]);
-}
-
-void Map::render(){
-	SDL_Rect space = {0, 0, Tile::WIDTH, Tile::LENGTH};
-	
-	for(int i = 0; i < Tile::ROWS; ++i){
-		for(int j = 0; j < Tile::COLS; ++j){
-			SDL_SetRenderDrawColor(gRenderer, tile[tileMap[j][i]].r, tile[tileMap[j][i]].g, tile[tileMap[j][i]].b, 0);
-			SDL_RenderFillRect(gRenderer, &space);
-			
-			space.x += space.w;
-		}
-		
-		space.x = 0;
-		space.y += space.h;
-	}
 }
 
 bool init(){
@@ -745,6 +738,16 @@ bool loadMedia(){
 			printf( "Unable to render pause text texture!\n" );
 			success = false;
 		}
+	}
+	
+	if(!gTerrainSheet.loadFromFile("Assets/terrain.png")){
+		printf("Failed to load terrain sprite sheet!\n");
+		success = false;
+	}else{
+		tile[GRASS] = new Tile({0, 0, 32, 32}, 0, 0);
+		tile[BRICK] = new Tile({32, 0, 32, 32}, 2, 1);
+		tile[WATER] = new Tile({64, 0, 32, 32}, 1, 0);
+		tile[EMPTY] = new Tile({96, 0, 32, 32}, 3, 0);
 	}
 
 	//Load player textures
