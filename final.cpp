@@ -1,9 +1,4 @@
-/*
-Compiled via command line using:
-	g++ ballHell.cpp -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -o ballHell
-*/
-
-//Using SDL, SDL_image, standard IO, vectors, and strings
+//Using SDL, SDL_image, SDL_ttf, standard IO, vectors, and strings
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -18,6 +13,10 @@ Compiled via command line using:
 //Screen dimension constants
 const int SCREEN_WIDTH = 1200;
 const int SCREEN_HEIGHT = 600;
+const int SCOREBOARD_HEIGHT = 50;
+const int PLAYFIELD_HEIGHT = SCREEN_WIDTH-SCOREBOARD_HEIGHT;
+
+using namespace std;
 
 //circle struct
 struct Circle{
@@ -25,6 +24,7 @@ struct Circle{
     int r;
 };
 
+bool checkCollision(Circle& c1, Circle& c2);
 //Texture wrapper class
 class LTexture{
 	public:
@@ -111,7 +111,7 @@ class Player{
 		static const int PLAYER_VEL = 10;
 
 		//Initializes the variables
-		Player(int ID);
+		Player(int);
 
 		//Takes key presses and adjusts the player's velocity
 		void handleEvent(SDL_Event& e);
@@ -122,9 +122,13 @@ class Player{
 		//Shows the player on the screen
 		void render();
 
+		void activatePowerUp(int id);
+
 		Circle& getCollider();
 
         void shiftColliders();
+
+        int getNLife();
     private:
 		//The X and Y offsets of the player
 		int mPosX, mPosY;
@@ -135,17 +139,34 @@ class Player{
 		//Player ID
 		int mPlayerID;
 
+		//Player life
+		int mLife;
+
 		//the collider for the circle
         Circle mCollider;
 
 };
 
-/*class Powers{
+class PowerUp{
 	public:
+		//The dimensions of the power ups
+		static const int POWERUP_WIDTH = 20;
+		static const int POWERUP_HEIGHT = 20;
+
+		//Initializes the variables
+		PowerUp(int id);
+
+		//Shows the powerups on the screen
+		void render();
+
+		Circle& getCollider();
+		int getPowerUpID();
 
 	private:
-
-};*/
+		int mPosX, mPosY;
+		int mPowerUpID;
+		Circle mCollider;
+};
 
 
 //Starts up SDL and creates window
@@ -173,16 +194,21 @@ LTexture gPlayerTwoTexture;
 LTexture gBombTexture;
 LTexture gShieldTexture;
 LTexture gLifeTexture;
+LTexture gBulletUpgradeTexture;
 
 LTexture gTimeTextTexture;
 LTexture gPauseTextTexture;
+LTexture gLifeAvailableTexture;
 
-
-///Vectors for Players
-std::vector<Player> gPlayers;
+///Vectors for the objects
+vector<Player> gPlayers;
+vector<PowerUp> gPowerUps;
 
 //Global timer
 LTimer gTimer;
+
+//Power up IDs
+const int LIFEID = 0, BOMBID = 1, SHIELDID = 2, BULLETUPGRADEID = 3;
 
 int main(int argc, char *args[]){	
 	gTimer.start();
@@ -199,8 +225,31 @@ int main(int argc, char *args[]){
 		}else{
 			//Main loop flag
 			bool quit = false;
-			
-			//Show players
+
+			//Create and push powerups in vector gPowerUps
+			int nLife = 3;
+			int nBomb = 0;
+			int nShield = 0;
+			int nBulletUpgrade = 5;
+
+			for(int j = 0; j < nLife; j++){
+				PowerUp life(LIFEID);
+				gPowerUps.push_back(life);
+			}
+			for(int i = 0; i < nBomb; i++){
+				PowerUp bomb(BOMBID);
+				gPowerUps.push_back(bomb);
+			}
+			for(int i = 0; i < nShield; i++){
+				PowerUp shield(SHIELDID);
+				gPowerUps.push_back(shield);
+			}
+			for(int i = 0; i < nBulletUpgrade; i++){
+				PowerUp bulletUpgrade(BULLETUPGRADEID);
+				gPowerUps.push_back(bulletUpgrade);
+			}
+
+			//Create and push players to vector
 			Player playerOne(0);
 			gPlayers.push_back(playerOne);
 			Player playerTwo(1);
@@ -242,29 +291,55 @@ int main(int argc, char *args[]){
 						gPlayers[i].handleEvent(e);
 					}
 				}
-				
+
 				if(gTimer.isStarted() && !gTimer.isPaused()){
+					//Setting up Viewports' dimensions
+					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
+					SDL_Rect playfield = {0, SCOREBOARD_HEIGHT, SCREEN_WIDTH, PLAYFIELD_HEIGHT};
+
+					//Clear screen
+					SDL_RenderClear(gRenderer);
+
+					//Set scoreboard and timer viewport
+					SDL_RenderSetViewport(gRenderer, &scoreboard);
+
+					SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xB4, 0xB4, 0xFF);
+					SDL_RenderFillRect(gRenderer, &scoreboard);
+					
 					//Set text to be rendered
 					timeText.str( "" );
 					timeText << "Time: " << (gTimer.getTicks() / 1000);
-
+					
 					//Render text
 					if(!gTimeTextTexture.loadFromRenderedText(timeText.str().c_str(), textColor)){
 						printf("Unable to render time texture!\n");
 					}
-
-					//Clear screen
+					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth())/2, (SCOREBOARD_HEIGHT-gTimeTextTexture.getHeight())/2);
+					for(int i = 0; i < gPlayers.size(); i++){
+						for(int j = 0; j < gPlayers[i].getNLife(); j++){
+							if(i==0)
+								gLifeAvailableTexture.render(gLifeAvailableTexture.getWidth() * j,(SCOREBOARD_HEIGHT-gLifeAvailableTexture.getHeight())/2);
+							else if(i==1)
+								gLifeAvailableTexture.render(SCREEN_WIDTH-gLifeAvailableTexture.getWidth() * (j+1),(SCOREBOARD_HEIGHT-gLifeAvailableTexture.getHeight())/2);
+						}
+					}
+					//Set playfield viewport
+					SDL_RenderSetViewport(gRenderer, &playfield);
 					SDL_SetRenderDrawColor(gRenderer, 0xB4, 0xB4, 0xB4, 0xFF);
-					SDL_RenderClear(gRenderer);
-					
-					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth()) - 50, 0);
-					gBombTexture.render(50,200);
-					gShieldTexture.render(10,200);
-					gLifeTexture.render(100,200);
+
+					for(int i = 0; i < gPowerUps.size(); i++){
+						gPowerUps[i].render();
+					}
 
 					for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].move();
 						gPlayers[i].render();
+						for(int j = 0; j < gPowerUps.size(); j++){
+							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
+						    	gPowerUps.erase(gPowerUps.begin()+j);
+						    	gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID());
+						    }
+						}
 					}
 				}
 
@@ -272,7 +347,6 @@ int main(int argc, char *args[]){
 					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 					SDL_RenderClear(gRenderer);
 					gPauseTextTexture.render((SCREEN_WIDTH-gPauseTextTexture.getWidth())/2, (SCREEN_HEIGHT-gPauseTextTexture.getHeight())/2);
-
 				}
 				//Update screen
 				SDL_RenderPresent(gRenderer);
@@ -282,7 +356,6 @@ int main(int argc, char *args[]){
 	
 	//Free resources and close SDL
 	close();
-	
 	return 0;
 }
 
@@ -362,7 +435,6 @@ bool LTexture::loadFromRenderedText(std::string textureText, SDL_Color textColor
 	return mTexture != NULL;
 }
 #endif
-
 void LTexture::free(){
 	//Free texture if it exists
 	if(mTexture != NULL){
@@ -397,7 +469,6 @@ void LTexture::render(int x, int y, SDL_Rect* clip, double angle, SDL_Point* cen
 		renderQuad.w = clip->w;
 		renderQuad.h = clip->h;
 	}
-	
 	//Render to screen
 	SDL_RenderCopyEx(gRenderer, mTexture, clip, &renderQuad, angle, center, flip);
 }	
@@ -498,11 +569,20 @@ bool LTimer::isPaused(){
 	return mPaused && mStarted;
 }
 
-Player::Player(int ID)
+Player::Player(int id)
 {
-    //Initialize the offsets
-    mPosX = 0;
-    mPosY = 0;
+	//assigning player ID
+	mPlayerID = id;
+
+    //Initialize the positions
+    if(mPlayerID == 0){
+    	mPosX = 0;
+    	mPosY = SCREEN_HEIGHT/2;
+    }
+    else if(mPlayerID == 1){
+    	mPosX = SCREEN_WIDTH-PLAYER_WIDTH;
+    	mPosY = SCREEN_HEIGHT/2;
+    }   
 
     //Initialize the velocity
     mVelX = 0;
@@ -513,7 +593,8 @@ Player::Player(int ID)
     mCollider.y = mPosY;
     mCollider.r = PLAYER_WIDTH/2;
 
-    mPlayerID = ID;
+    //default number of lives
+    mLife = 3;
 }
 
 void Player::handleEvent(SDL_Event& e){
@@ -521,18 +602,18 @@ void Player::handleEvent(SDL_Event& e){
 	if(e.type == SDL_KEYDOWN && e.key.repeat == 0){
     	if(mPlayerID == 0){
 	        switch( e.key.keysym.sym ){
-	            case SDLK_UP: mVelY -= PLAYER_VEL; break;
-	            case SDLK_DOWN: mVelY += PLAYER_VEL; break;
-	            case SDLK_LEFT: mVelX -= PLAYER_VEL; break;
-	            case SDLK_RIGHT: mVelX += PLAYER_VEL; break;
+	        	case SDLK_w: mVelY -= PLAYER_VEL; break;
+	            case SDLK_s: mVelY += PLAYER_VEL; break;
+	            case SDLK_a: mVelX -= PLAYER_VEL; break;
+	            case SDLK_d: mVelX += PLAYER_VEL; break;
 	        }
     	}
     	if(mPlayerID == 1){
 	        switch( e.key.keysym.sym ){
-	            case SDLK_w: mVelY -= PLAYER_VEL; break;
-	            case SDLK_s: mVelY += PLAYER_VEL; break;
-	            case SDLK_a: mVelX -= PLAYER_VEL; break;
-	            case SDLK_d: mVelX += PLAYER_VEL; break;
+	            case SDLK_UP: mVelY -= PLAYER_VEL; break;
+	            case SDLK_DOWN: mVelY += PLAYER_VEL; break;
+	            case SDLK_LEFT: mVelX -= PLAYER_VEL; break;
+	            case SDLK_RIGHT: mVelX += PLAYER_VEL; break;
 	        }
     	}
     }
@@ -541,19 +622,19 @@ void Player::handleEvent(SDL_Event& e){
         if(mPlayerID == 0){
         	//Adjust the velocity
 	        switch( e.key.keysym.sym ){
-	            case SDLK_UP: mVelY += PLAYER_VEL; break;
-	            case SDLK_DOWN: mVelY -= PLAYER_VEL; break;
-	            case SDLK_LEFT: mVelX += PLAYER_VEL; break;
-	            case SDLK_RIGHT: mVelX -= PLAYER_VEL; break;
+	        	case SDLK_w: mVelY += PLAYER_VEL; break;
+	            case SDLK_s: mVelY -= PLAYER_VEL; break;
+	            case SDLK_a: mVelX += PLAYER_VEL; break;
+	            case SDLK_d: mVelX -= PLAYER_VEL; break;   
 	        }
     	}
     	if(mPlayerID == 1){
         	//Adjust the velocity
 	        switch( e.key.keysym.sym ){
-	            case SDLK_w: mVelY += PLAYER_VEL; break;
-	            case SDLK_s: mVelY -= PLAYER_VEL; break;
-	            case SDLK_a: mVelX += PLAYER_VEL; break;
-	            case SDLK_d: mVelX -= PLAYER_VEL; break;
+	            case SDLK_UP: mVelY += PLAYER_VEL; break;
+	            case SDLK_DOWN: mVelY -= PLAYER_VEL; break;
+	            case SDLK_LEFT: mVelX += PLAYER_VEL; break;
+	            case SDLK_RIGHT: mVelX -= PLAYER_VEL; break;
 	        }
     	}
     }
@@ -565,7 +646,7 @@ void Player::move()
     mPosX += mVelX;
     shiftColliders();
     //If the Player went too far to the left or right
-    if((mPosX < 0) || (mPosX + PLAYER_WIDTH > SCREEN_WIDTH)){
+    if((mPosX < 0) || (mPosX + PLAYER_WIDTH > SCREEN_WIDTH) || (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) ){
         //Move back
         mPosX -= mVelX;
         shiftColliders();
@@ -575,7 +656,7 @@ void Player::move()
     mPosY += mVelY;
     shiftColliders();
     //If the Player went too far up or down
-    if((mPosY < 0)||(mPosY + PLAYER_HEIGHT > SCREEN_HEIGHT)){
+    if((mPosY < 0)||(mPosY + PLAYER_HEIGHT > SCREEN_HEIGHT-SCOREBOARD_HEIGHT) || (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) ){
         //Move back
         mPosY -= mVelY;
         shiftColliders();
@@ -592,6 +673,10 @@ void Player::shiftColliders(){
 	mCollider.y = mPosY;
 }
 
+int Player::getNLife(){
+	return mLife;
+}
+
 void Player::render(){
     //Show the Player
     if(mPlayerID == 0){
@@ -601,6 +686,80 @@ void Player::render(){
 		gPlayerTwoTexture.render(mPosX, mPosY);
 	}
 
+}
+
+void Player::activatePowerUp(int id){
+	switch(id){
+		case LIFEID:
+			printf("life\n");
+			mLife++;
+			break;
+		case BOMBID:
+			printf("bomb\n");
+			break;
+		case SHIELDID:
+			printf("shield\n");
+			break;
+		case BULLETUPGRADEID:
+			printf("bullet upgraded\n");
+			break;
+	}
+}
+
+
+PowerUp::PowerUp(int id){
+	//assigning powerup ID
+	mPowerUpID = id;
+
+    //Initialize the positions
+    switch(mPowerUpID){
+    	case 0:
+    		mPosX = rand()%SCREEN_WIDTH - POWERUP_WIDTH;
+    		mPosY = rand()%(SCREEN_HEIGHT) - (POWERUP_HEIGHT+SCOREBOARD_HEIGHT);
+    		break;
+    	case 1:
+    		mPosX = rand()%SCREEN_WIDTH - POWERUP_WIDTH;
+    		mPosY = rand()%(SCREEN_HEIGHT) - (POWERUP_HEIGHT+SCOREBOARD_HEIGHT);
+    		break;
+    	case 2:
+    		mPosX = rand()%SCREEN_WIDTH - POWERUP_WIDTH;
+    		mPosY = rand()%(SCREEN_HEIGHT) - (POWERUP_HEIGHT+SCOREBOARD_HEIGHT);
+    		break;
+    	case 3:
+    		mPosX = rand()%SCREEN_WIDTH - POWERUP_WIDTH;
+    		mPosY = rand()%(SCREEN_HEIGHT) - (POWERUP_HEIGHT+SCOREBOARD_HEIGHT);
+    		break;
+    }
+    //for the colliders
+    mCollider.x = mPosX;
+    mCollider.y = mPosY;
+    mCollider.r = POWERUP_WIDTH/2;
+}
+
+Circle& PowerUp::getCollider(){
+    return mCollider;
+}
+
+int PowerUp::getPowerUpID(){
+	return mPowerUpID;
+}
+
+void PowerUp::render(){
+    //Show the powerups
+	switch(mPowerUpID){
+    	case 0:
+    		gLifeTexture.render(mPosX, mPosY);
+    		break;
+    	case 1:
+    		gBombTexture.render(mPosX, mPosY);
+    		break;
+    	case 2:
+    		gShieldTexture.render(mPosX, mPosY);
+    		break;
+    	case 3:
+    		gBulletUpgradeTexture.render(mPosX, mPosY);
+    		break;
+    }
 }
 
 bool init(){
@@ -692,6 +851,16 @@ bool loadMedia(){
 		printf("Failed to load life texture!\n");
 		success = false;
 	}
+	if(!gBulletUpgradeTexture.loadFromFile("Assets/bulletUp.png")){
+		printf("Failed to load life texture!\n");
+		success = false;
+	}
+
+	//Load players' life available image
+	if(!gLifeAvailableTexture.loadFromFile("Assets/lifeAvailable.png")){
+		printf("Failed to load life texture!\n");
+		success = false;
+	}
 	
 	return success;
 }
@@ -707,7 +876,13 @@ void close(){
 	//Free loaded images
 	gPauseTextTexture.free();
 	gTimeTextTexture.free();
+
 	gBombTexture.free();
+	gLifeTexture.free();
+	gShieldTexture.free();
+	gBulletUpgradeTexture.free();
+
+	gLifeAvailableTexture.free();
 	gPlayerOneTexture.free();
 	gPlayerTwoTexture.free();
 
