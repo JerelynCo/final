@@ -426,7 +426,6 @@ bool LTexture::loadFromRenderedText(std::string textureText, SDL_Color textColor
 			mWidth = textSurface->w;
 			mHeight = textSurface->h;
 		}
-		
 		//Get rid of old surface
 		SDL_FreeSurface(textSurface);
 	}
