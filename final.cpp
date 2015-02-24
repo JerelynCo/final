@@ -17,8 +17,8 @@ Compiled via command line using:
 #define PI 3.14159265
 
 //Screen dimension constants
-const int SCREEN_WIDTH = 1225;
-const int SCREEN_LENGTH = 625;
+const int SCREEN_WIDTH = 1200;
+const int SCREEN_LENGTH = 600;
 
 enum Terrain{
 	GRASS,
@@ -104,14 +104,14 @@ class LTimer{
 };
 
 struct Tile{
-		static const int LENGTH = 25, WIDTH = 25;
-		static const int ROWS = SCREEN_LENGTH/LENGTH, COLS = SCREEN_WIDTH/WIDTH;
+		static const int LENGTH = 30, WIDTH = 30;
+		static const int ROWS = 20, COLS = 30;
 
 		SDL_Rect t;
-		const Uint8 m, v;
+		const Uint8 m;
 		
-		Tile(SDL_Rect tile, Uint8 mobility, Uint8 vulnerability):
-			t(tile), m(mobility), v(vulnerability) {};
+		Tile(SDL_Rect tile, Uint8 mobility):
+			t(tile), m(mobility) {};
 };
 
 class Map{
@@ -210,8 +210,7 @@ std::vector<Player> gPlayers;
 //Global timer
 LTimer gTimer;
 
-LTexture gTerrainSheet;
-
+LTexture gSpriteSheet;
 Tile* tile[4];
 
 int main(int argc, char *args[]){	
@@ -561,7 +560,7 @@ Tile* Map::getTile(int x, int y){
 void Map::render(){
 	for(int i = 0; i < Tile::ROWS; ++i){
 		for(int j = 0; j < Tile::COLS; ++j){
-			gTerrainSheet.render(j*Tile::WIDTH, i*Tile::LENGTH, &(tile[tileMap[j][i]]->t));
+			gSpriteSheet.render(j*Tile::WIDTH, i*Tile::LENGTH, &(tile[tileMap[j][i]]->t));
 		}
 	}
 }
@@ -740,14 +739,14 @@ bool loadMedia(){
 		}
 	}
 	
-	if(!gTerrainSheet.loadFromFile("Assets/terrain.png")){
+	if(!gSpriteSheet.loadFromFile("Assets/terrain.png")){
 		printf("Failed to load terrain sprite sheet!\n");
 		success = false;
 	}else{
-		tile[GRASS] = new Tile({0, 0, 32, 32}, 0, 0);
-		tile[BRICK] = new Tile({32, 0, 32, 32}, 2, 1);
-		tile[WATER] = new Tile({64, 0, 32, 32}, 1, 0);
-		tile[EMPTY] = new Tile({96, 0, 32, 32}, 3, 0);
+		tile[GRASS] = new Tile({0, 0, 32, 32}, 0);
+		tile[BRICK] = new Tile({32, 0, 32, 32}, 2);
+		tile[WATER] = new Tile({64, 0, 32, 32}, 1);
+		tile[EMPTY] = new Tile({96, 0, 32, 32}, 3);
 	}
 
 	//Load player textures
@@ -791,6 +790,7 @@ void close(){
 	gBombTexture.free();
 	gPlayerOneTexture.free();
 	gPlayerTwoTexture.free();
+	gSpriteSheet.free();
 
 	//Free global font
 	TTF_CloseFont(gFont);
