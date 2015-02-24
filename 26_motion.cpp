@@ -132,9 +132,6 @@ class Dot
 		//Shows the dot on the screen
 		void render();
 
-		//void shoot(std::vector<Bullet>&);
-		//void shoot(bool shoot, Bullet &b, int vel,int playerID);
-
 		//Moves the collision circle relative to the ball's offset
 		void shiftColliders();
 
@@ -145,7 +142,7 @@ class Dot
 		Circle& getCollider();
 
 
-    //private:
+    private:
 		//The X and Y offsets of the dot
 		int mPosX, mPosY;
 
@@ -182,10 +179,11 @@ class Bullet
 
 		void update(int dir);
 
-        void setCreateBul(Dot &d);
+        void render();
 
-		void render();
+        void destroy();
 
+      //private:
 		int bulPosX,bulPosY,bulVelX,bulVelY;
 		bool createBul;
 
@@ -550,19 +548,6 @@ void Bullet:: update(int dir)
 //put the controls at dot
 
 
-//sets createBul to false amd moves the bullet back to the dot after bullet has exited the screen
-void Bullet::setCreateBul(Dot &d){
-    //bullet one
-    if (( bulPosY + BULLET_HEIGHT > SCREEN_HEIGHT )||( bulPosX < 0 ) || ( bulPosX + BULLET_WIDTH > SCREEN_WIDTH ))
-    {
-        //Move back to bullet position
-        bulPosY = d.mPosY;
-        bulPosX = d.mPosX;
-        createBul = false;
-    }
-
-}
-
 void Dot::render()
 {
     //Show the dot
@@ -573,6 +558,11 @@ void Bullet::render()
 {
     //Show the Bullet
 	gBulletTexture.render( bulPosX, bulPosY );
+}
+
+void Bullet::destroy()
+{
+    gBulletTexture.free();
 }
 
 bool init()
@@ -667,6 +657,7 @@ void close()
 }
 //http://gamedev.stackexchange.com/questions/22616/sdl-bullet-movement
 /***split the controls for bullet one and bullet two***/
+//int i =0;
 int main( int argc, char* args[] )
 {
 	//Start up SDL and create window
@@ -739,19 +730,26 @@ int main( int argc, char* args[] )
                 for(auto &Bullet : dot.vecBul){
                     if((Bullet.bulPosY<0)|| (Bullet.bulPosY + Bullet.BULLET_HEIGHT > SCREEN_HEIGHT )||( Bullet.bulPosX < 0 ) || ( Bullet.bulPosX + Bullet.BULLET_WIDTH > SCREEN_WIDTH ))
                     {
-                        //Bullet.pop();
+                        //deconstruct and erase
                         Bullet.~Bullet();
-                        printf("Hello");
+                        dot.vecBul.erase(dot.vecBul.begin());
+
                     }
                 }
-                //for(int i = 0; i<10;i++){
-                  //  vecBul[i].render();
-               //}
-                //vecBul2[i].render();
+
+                for(auto &Bullet : dot1.vecBul){
+                    if((Bullet.bulPosY<0)|| (Bullet.bulPosY + Bullet.BULLET_HEIGHT > SCREEN_HEIGHT )||( Bullet.bulPosX < 0 ) || ( Bullet.bulPosX + Bullet.BULLET_WIDTH > SCREEN_WIDTH ))
+                    {
+                        //deconstruct and erase
+                        Bullet.~Bullet();
+                        dot1.vecBul.erase(dot1.vecBul.begin());
+
+                    }
+                }
+
                 //renders a dot
 				dot.render();
 				dot1.render();
-
 
 				//Update screen
 				SDL_RenderPresent( gRenderer );
@@ -763,86 +761,3 @@ int main( int argc, char* args[] )
 
 	return 0;
 }
-/*
-
-
-                //fix create bull it generates 12
-				//if(createBul == true)
-				/**increment i when bullet is shoot**/
-                //changes placed createBul inside the bullet class
-                /*if((dot.mPosX!=vecBul[i].bulPosX)||(dot.mPosY!=vecBul[i].bulPosY))
-                {
-                    i++;
-                    printf("%u",i);
-                }
-                //reset counter
-                if(i == 9){
-                    i=0;
-                }
-                //printf(" ");
-                //printf("%u",i);
-                //printf("%u",vecBul[i].createBul);
-
-
-*/
-
-/*
-
-/*void Dot::shoot(bool shoot,Bullet &b,int vel,int playerID){
-    //follows the dot
-    if(shoot == false){
-        b.bulPosX = mPosX;
-        b.bulPosY = mPosY;
-    }
-    //the actual shooting
-    if(playerID == 1)
-    {
-        if(shoot == true && shootDir == 1)//left
-        {
-             b.bulPosX =  b.bulPosX -10;
-             b.bulPosY = mPosY;
-        }
-        else if(shoot == true && shootDir == 3)//right
-        {
-             b.bulPosX = b.bulPosX +10;
-             b.bulPosY = mPosY;
-        }
-        else if(shoot == true && shootDir == 2)//p1 shoot down p2 shoot up
-        {
-             b.bulPosX = mPosX;
-             b.bulPosY = b.bulPosY + vel;
-        }
-    }
-    else if(playerID == 2)
-    {
-        if(shoot == true && shootDir2 == 4)//left
-        {
-             b.bulPosX = b.bulPosX -10;
-             b.bulPosY = mPosY;
-        }
-        else if(shoot == true && shootDir2 == 6)//right
-        {
-             b.bulPosX = b.bulPosX +10;
-             b.bulPosY = mPosY;
-        }
-        else if(shoot == true && shootDir2 == 2)//p1 shoot down p2 shoot up
-        {
-             b.bulPosX = mPosX;
-             b.bulPosY = b.bulPosY + vel;
-        }
-    }
-}*/
-
-/*
-//shoots the bullets
-//dot.shoot(vecBul[i].createBul,vecBul[i],10,1);
-// //dot1.shoot(createBul2,vecBul2[i],-10,2);
-
-//sets createBul to false after bullet has exited the screen
-//for(int i = 0; i<10;i++){
-//vecBul[i].setCreateBul(dot);
-//}
-//dot1.setCreateBul(vecBul2[i],2);
-*/
-
-
