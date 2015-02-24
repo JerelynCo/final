@@ -181,10 +181,7 @@ class Bullet
 
         void render();
 
-        void destroy();
-
-      //private:
-		int bulPosX,bulPosY,bulVelX,bulVelY;
+        int bulPosX,bulPosY,bulVelX,bulVelY;
 		bool createBul;
 
 
@@ -560,11 +557,6 @@ void Bullet::render()
 	gBulletTexture.render( bulPosX, bulPosY );
 }
 
-void Bullet::destroy()
-{
-    gBulletTexture.free();
-}
-
 bool init()
 {
 	//Initialization flag
@@ -657,7 +649,6 @@ void close()
 }
 //http://gamedev.stackexchange.com/questions/22616/sdl-bullet-movement
 /***split the controls for bullet one and bullet two***/
-//int i =0;
 int main( int argc, char* args[] )
 {
 	//Start up SDL and create window
