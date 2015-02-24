@@ -12,6 +12,13 @@ and may not be redistributed without written permission.*/
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
 
+//diresctions
+
+const int NORTH = 1;
+const int SOUTH = 2;
+const int RIGHT = 3;
+const int LEFT = 4;
+
 struct Circle{
 	int x, y;
 	int r;
@@ -153,9 +160,9 @@ class Dot
 bool createBul2 = false;
 
 //2=shoot in front 1,4=shoot left 3,6=shoot right
-int shootDir = 2;
+int shootDir = SOUTH;
 
-int shootDir2 = 2;
+int shootDir2 = SOUTH;
 
  //counter for bullet
 int i = 0;
@@ -169,11 +176,11 @@ class Bullet
 		//Maximum axis velocity of the dot
 		static const int BULLET_VEL = 10;
 
-
 		Bullet(int x, int y);
 		//Bullet(SDL_Point,Xvel,Yvel);
+        ~Bullet(){};
 
-		void update();
+		void update(int dir);
 
         void setCreateBul(Dot &d);
 
@@ -392,19 +399,19 @@ void Dot::handleEventP1( SDL_Event& e )
         {
             case SDLK_UP:
                 mVelY -= DOT_VEL;
-                shootDir = 2;
+                shootDir = NORTH;
                 break;
             case SDLK_DOWN:
                 mVelY += DOT_VEL;
-                shootDir = 2;
+                shootDir = SOUTH;
                 break;
             case SDLK_LEFT:
                 mVelX -= DOT_VEL;
-                shootDir = 1;
+                shootDir = LEFT;
                 break;
             case SDLK_RIGHT:
                 mVelX += DOT_VEL;
-                shootDir = 3;
+                shootDir = RIGHT;
                 break;
         }
     }
@@ -439,19 +446,19 @@ void Dot::handleEventP2( SDL_Event& e)
 
             case SDLK_w:
                 mVelY -= DOT_VEL;
-                shootDir2 = 2;
+                shootDir2 = NORTH;
                 break;
             case SDLK_s:
                 mVelY += DOT_VEL;
-                shootDir2 = 2;
+                shootDir2 = SOUTH;
                 break;
             case SDLK_a:
                 mVelX -= DOT_VEL;
-                shootDir2 = 4;
+                shootDir2 = LEFT;
                 break;
             case SDLK_d:
                 mVelX += DOT_VEL;
-                shootDir2 = 6;
+                shootDir2 = RIGHT;
                 break;
         }
     }
@@ -471,7 +478,7 @@ void Dot::handleEventP2( SDL_Event& e)
     //for shooting
     if((e.type == SDL_KEYDOWN && e.key.repeat == 0) && e.key.keysym.sym == SDLK_q)
     {
-        createBul2 = true;
+        vecBul.emplace_back(mPosX,mPosY);
     }
 
 }
@@ -521,55 +528,27 @@ void Dot::move(Circle& other)
     }
 }
 
-void Bullet:: update()
+void Bullet:: update(int dir)
 {
-   bulPosY = bulPosY + 10;
+   if(dir == NORTH)
+   {
+        bulPosY = bulPosY - 10;
+   }
+   else if(dir == SOUTH)
+   {
+        bulPosY = bulPosY + 10;
+   }
+   else if( dir == RIGHT)
+   {
+        bulPosX = bulPosX + 10;
+   }
+   else if(dir == LEFT)
+   {
+        bulPosX = bulPosX - 10;
+   }
 }
 //put the controls at dot
-/*void Dot::shoot(bool shoot,Bullet &b,int vel,int playerID){
-    //follows the dot
-    if(shoot == false){
-        b.bulPosX = mPosX;
-        b.bulPosY = mPosY;
-    }
-    //the actual shooting
-    if(playerID == 1)
-    {
-        if(shoot == true && shootDir == 1)//left
-        {
-             b.bulPosX =  b.bulPosX -10;
-             b.bulPosY = mPosY;
-        }
-        else if(shoot == true && shootDir == 3)//right
-        {
-             b.bulPosX = b.bulPosX +10;
-             b.bulPosY = mPosY;
-        }
-        else if(shoot == true && shootDir == 2)//p1 shoot down p2 shoot up
-        {
-             b.bulPosX = mPosX;
-             b.bulPosY = b.bulPosY + vel;
-        }
-    }
-    else if(playerID == 2)
-    {
-        if(shoot == true && shootDir2 == 4)//left
-        {
-             b.bulPosX = b.bulPosX -10;
-             b.bulPosY = mPosY;
-        }
-        else if(shoot == true && shootDir2 == 6)//right
-        {
-             b.bulPosX = b.bulPosX +10;
-             b.bulPosY = mPosY;
-        }
-        else if(shoot == true && shootDir2 == 2)//p1 shoot down p2 shoot up
-        {
-             b.bulPosX = mPosX;
-             b.bulPosY = b.bulPosY + vel;
-        }
-    }
-}*/
+
 
 //sets createBul to false amd moves the bullet back to the dot after bullet has exited the screen
 void Bullet::setCreateBul(Dot &d){
@@ -581,13 +560,7 @@ void Bullet::setCreateBul(Dot &d){
         bulPosX = d.mPosX;
         createBul = false;
     }
-    //bullet two
-    /*if((( b.bulPosY < 0 )||( b.bulPosX < 0 ) || ( b.bulPosX + b.BULLET_WIDTH > SCREEN_WIDTH )) && playerID == 2 )
-    {
-        b.bulPosY = mPosY;
-        b.bulPosX = mPosX;
-        createBul2 = false;
-    }*/
+
 }
 
 void Dot::render()
@@ -719,12 +692,7 @@ int main( int argc, char* args[] )
 			//dots and bullets on the screen
 			Dot dot(SCREEN_WIDTH/2,10);
             Dot dot1(SCREEN_WIDTH/2,SCREEN_HEIGHT-dot1.DOT_HEIGHT-10);
-            /*for(int i =0; i<10; i++){
-                 Bullet bul(dot);
-                 Bullet bul2(dot1);
-                 vecBul.push_back(bul);
-                 vecBul2.push_back(bul2);
-            }*/
+
 			//While application is running
 			while( !quit )
 			{
@@ -739,26 +707,21 @@ int main( int argc, char* args[] )
 					}
      				//Handle input for the dot
 					dot.handleEventP1(e);
-					//dot1.handleEventP2(e);
+					dot1.handleEventP2(e);
                     //printf("%u",vecBul[i].createBul);
 				}
 
                 //update bullet position
 				for(auto &Bullet : dot.vecBul){
-                    Bullet.update();
+                    Bullet.update(shootDir);
+                }
+                for(auto &Bullet : dot1.vecBul){
+                    Bullet.update(shootDir2);
                 }
 				//Move the dot
 				dot.move(dot1.getCollider());
-				//dot1.move(dot.getCollider());
-                //shoots the bullets
-                //dot.shoot(vecBul[i].createBul,vecBul[i],10,1);
-               // //dot1.shoot(createBul2,vecBul2[i],-10,2);
+				dot1.move(dot.getCollider());
 
-                //sets createBul to false after bullet has exited the screen
-               //for(int i = 0; i<10;i++){
-                //vecBul[i].setCreateBul(dot);
-               //}
-                //dot1.setCreateBul(vecBul2[i],2);
 
 				//Clear screen
 				SDL_SetRenderDrawColor( gRenderer, 0xFF, 0xFF, 0xFF, 0xFF );
@@ -768,6 +731,18 @@ int main( int argc, char* args[] )
 				//makes a bullet
                 for(auto &Bullet : dot.vecBul){
                     Bullet.render();
+                }
+                for(auto &Bullet : dot1.vecBul){
+                    Bullet.render();
+                }
+                //decontruction
+                for(auto &Bullet : dot.vecBul){
+                    if((Bullet.bulPosY<0)|| (Bullet.bulPosY + Bullet.BULLET_HEIGHT > SCREEN_HEIGHT )||( Bullet.bulPosX < 0 ) || ( Bullet.bulPosX + Bullet.BULLET_WIDTH > SCREEN_WIDTH ))
+                    {
+                        //Bullet.pop();
+                        Bullet.~Bullet();
+                        printf("Hello");
+                    }
                 }
                 //for(int i = 0; i<10;i++){
                   //  vecBul[i].render();
@@ -811,6 +786,63 @@ int main( int argc, char* args[] )
 
 */
 
+/*
 
+/*void Dot::shoot(bool shoot,Bullet &b,int vel,int playerID){
+    //follows the dot
+    if(shoot == false){
+        b.bulPosX = mPosX;
+        b.bulPosY = mPosY;
+    }
+    //the actual shooting
+    if(playerID == 1)
+    {
+        if(shoot == true && shootDir == 1)//left
+        {
+             b.bulPosX =  b.bulPosX -10;
+             b.bulPosY = mPosY;
+        }
+        else if(shoot == true && shootDir == 3)//right
+        {
+             b.bulPosX = b.bulPosX +10;
+             b.bulPosY = mPosY;
+        }
+        else if(shoot == true && shootDir == 2)//p1 shoot down p2 shoot up
+        {
+             b.bulPosX = mPosX;
+             b.bulPosY = b.bulPosY + vel;
+        }
+    }
+    else if(playerID == 2)
+    {
+        if(shoot == true && shootDir2 == 4)//left
+        {
+             b.bulPosX = b.bulPosX -10;
+             b.bulPosY = mPosY;
+        }
+        else if(shoot == true && shootDir2 == 6)//right
+        {
+             b.bulPosX = b.bulPosX +10;
+             b.bulPosY = mPosY;
+        }
+        else if(shoot == true && shootDir2 == 2)//p1 shoot down p2 shoot up
+        {
+             b.bulPosX = mPosX;
+             b.bulPosY = b.bulPosY + vel;
+        }
+    }
+}*/
+
+/*
+//shoots the bullets
+//dot.shoot(vecBul[i].createBul,vecBul[i],10,1);
+// //dot1.shoot(createBul2,vecBul2[i],-10,2);
+
+//sets createBul to false after bullet has exited the screen
+//for(int i = 0; i<10;i++){
+//vecBul[i].setCreateBul(dot);
+//}
+//dot1.setCreateBul(vecBul2[i],2);
+*/
 
 
