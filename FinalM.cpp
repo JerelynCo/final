@@ -1,18 +1,26 @@
 //Using SDL, SDL_image, SDL_ttf, standard IO, vectors, and strings
+
+/*
+Compiled via command line using:
+	g++ ballHell.cpp -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -o final
+*/
+
+//Using SDL, SDL_image, standard IO, vectors, and strings
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <cmath>
 #include <cstdio>
+#include <random>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <cmath>
-#include <sstream>
 
 #define PI 3.14159265
 
 //Screen dimension constants
-const int SCREEN_WIDTH = 1200;
-const int SCREEN_HEIGHT = 600;
+const int SCREEN_WIDTH = 1225;
+const int SCREEN_HEIGHT = 625;
 const int SCOREBOARD_HEIGHT = 50;
 const int PLAYFIELD_HEIGHT = SCREEN_WIDTH-SCOREBOARD_HEIGHT;
 
@@ -24,7 +32,14 @@ struct Circle{
     int r;
 };
 
-bool checkCollision(Circle& c1, Circle& c2);
+
+enum Terrain{
+	GRASS,
+	BRICK,
+	WATER,
+	EMPTY
+};
+
 //Texture wrapper class
 class LTexture{
 	public:
@@ -101,14 +116,33 @@ class LTimer{
 		bool mStarted;
 };
 
+struct Tile{
+		static const int HEIGHT = 25, WIDTH = 25;
+		static const int ROWS = SCREEN_HEIGHT/HEIGHT, COLS = SCREEN_WIDTH/WIDTH;
+
+		SDL_Rect t;
+		const Uint8 m, v;
+		
+		Tile(SDL_Rect tile, Uint8 mobility, Uint8 vulnerability):
+			t(tile), m(mobility), v(vulnerability) {};
+};
+
+class Map{
+		int tileMap[Tile::COLS][Tile::ROWS];
+	public:
+		Map();
+		Tile* getTile(int, int);
+		void render();
+};
+
+//Player class
 class Player{
 	public:
 		//The dimensions of the player
-		static const int PLAYER_WIDTH = 20;
-		static const int PLAYER_HEIGHT = 20;
-
+		static const int PLAYER_WIDTH = 20, PLAYER_HEIGHT = 20;
+		
 		//Maximum axis velocity of the player
-		static const int PLAYER_VEL = 10;
+		static const int PLAYER_VEL = 2;
 
 		//Initializes the variables
 		Player(int);
@@ -117,7 +151,7 @@ class Player{
 		void handleEvent(SDL_Event& e);
 
 		//Moves the player
-		void move();
+		void move(Map*);
 
 		//Shows the player on the screen
 		void render();
@@ -129,6 +163,7 @@ class Player{
         void shiftColliders();
 
         int getNLife();
+
     private:
 		//The X and Y offsets of the player
 		int mPosX, mPosY;
@@ -162,12 +197,13 @@ class PowerUp{
 		Circle& getCollider();
 		int getPowerUpID();
 
+		void clear();
+
 	private:
 		int mPosX, mPosY;
 		int mPowerUpID;
 		Circle mCollider;
 };
-
 
 //Starts up SDL and creates window
 bool init();
@@ -178,11 +214,14 @@ bool loadMedia();
 //Frees media and shuts down SDL
 void close();
 
-//The window we'll be rendering to
-SDL_Window* gWindow = NULL;
+//Checks collision between c1 and c2
+bool checkCollision(Circle& c1, Circle& c2);
 
 //The window renderer
 SDL_Renderer* gRenderer = NULL;
+
+//The window we'll be rendering to
+SDL_Window* gWindow = NULL;
 
 //Globally used font
 TTF_Font* gFont = NULL;
@@ -200,21 +239,29 @@ LTexture gTimeTextTexture;
 LTexture gPauseTextTexture;
 LTexture gLifeAvailableTexture;
 
+LTexture gTerrainSheet;
+
 ///Vectors for the objects
 vector<Player> gPlayers;
 vector<PowerUp> gPowerUps;
 
+
 //Global timer
 LTimer gTimer;
+LTimer gPowerUpsTimer;
 
-//Power up IDs
+//Tile array
+Tile* tile[4];
+
+//Power up variables
 const int LIFEID = 0, BOMBID = 1, SHIELDID = 2, BULLETUPGRADEID = 3;
+int nLife = 3, nBomb = 0, nShield = 0, nBulletUpgrade = 0;
+int powerUpsDuration = 3;
 
 int main(int argc, char *args[]){	
 	gTimer.start();
-	if(gTimer.isStarted()){
-		printf("Start");
-	}
+	int set = 1;
+
 	//Start up SDL and create window
 	if(!init()){
 		printf("Failed to initialize!\n");
@@ -225,28 +272,15 @@ int main(int argc, char *args[]){
 		}else{
 			//Main loop flag
 			bool quit = false;
-
 			//Create and push powerups in vector gPowerUps
-			int nLife = 3;
-			int nBomb = 0;
-			int nShield = 0;
-			int nBulletUpgrade = 5;
+			int powerUpsArr[5][4] = {{LIFEID, BOMBID, SHIELDID, BULLETUPGRADEID}, {3, 0, 0, 0}, {0, 2, 0, 0}, {0, 0, 0, 2}, {0, 0, 2, 0}};
+			
 
-			for(int j = 0; j < nLife; j++){
-				PowerUp life(LIFEID);
-				gPowerUps.push_back(life);
-			}
-			for(int i = 0; i < nBomb; i++){
-				PowerUp bomb(BOMBID);
-				gPowerUps.push_back(bomb);
-			}
-			for(int i = 0; i < nShield; i++){
-				PowerUp shield(SHIELDID);
-				gPowerUps.push_back(shield);
-			}
-			for(int i = 0; i < nBulletUpgrade; i++){
-				PowerUp bulletUpgrade(BULLETUPGRADEID);
-				gPowerUps.push_back(bulletUpgrade);
+			for(int i = 0; i < 4; i++){
+				for(int j = 0; j < powerUpsArr[set][i]; j++){
+					PowerUp powerup(powerUpsArr[0][i]);
+					gPowerUps.push_back(powerup);
+				}
 			}
 
 			//Create and push players to vector
@@ -254,7 +288,7 @@ int main(int argc, char *args[]){
 			gPlayers.push_back(playerOne);
 			Player playerTwo(1);
 			gPlayers.push_back(playerTwo);
-
+			
 			//Event handler
 			SDL_Event e;
 
@@ -266,7 +300,9 @@ int main(int argc, char *args[]){
 
 			//start global game timer
 			gTimer.start();
+
 			
+			Map map;
 			//While application is running
 			while(!quit){									
 				//Handle events on queue
@@ -303,7 +339,7 @@ int main(int argc, char *args[]){
 					//Set scoreboard and timer viewport
 					SDL_RenderSetViewport(gRenderer, &scoreboard);
 
-					SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xB4, 0xB4, 0xFF);
+					SDL_SetRenderDrawColor(gRenderer, 0x3F, 0xB4, 0xB4, 0xFF);
 					SDL_RenderFillRect(gRenderer, &scoreboard);
 					
 					//Set text to be rendered
@@ -315,6 +351,7 @@ int main(int argc, char *args[]){
 						printf("Unable to render time texture!\n");
 					}
 					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth())/2, (SCOREBOARD_HEIGHT-gTimeTextTexture.getHeight())/2);
+
 					for(int i = 0; i < gPlayers.size(); i++){
 						for(int j = 0; j < gPlayers[i].getNLife(); j++){
 							if(i==0)
@@ -326,13 +363,25 @@ int main(int argc, char *args[]){
 					//Set playfield viewport
 					SDL_RenderSetViewport(gRenderer, &playfield);
 					SDL_SetRenderDrawColor(gRenderer, 0xB4, 0xB4, 0xB4, 0xFF);
+					
+					map.render();
 
+	
 					for(int i = 0; i < gPowerUps.size(); i++){
 						gPowerUps[i].render();
+						if(!gPowerUpsTimer.isStarted()){
+							gPowerUpsTimer.start();
+						}
 					}
+					if(gPowerUpsTimer.getTicks()/1000 > powerUpsDuration){
+						gPowerUps.clear();
+						gPowerUpsTimer.stop();
+						set++;
+					}
+					
 
 					for(int i = 0; i < gPlayers.size(); i++){
-						gPlayers[i].move();
+						gPlayers[i].move(&map);
 						gPlayers[i].render();
 						for(int j = 0; j < gPowerUps.size(); j++){
 							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
@@ -348,6 +397,7 @@ int main(int argc, char *args[]){
 					SDL_RenderClear(gRenderer);
 					gPauseTextTexture.render((SCREEN_WIDTH-gPauseTextTexture.getWidth())/2, (SCREEN_HEIGHT-gPauseTextTexture.getHeight())/2);
 				}
+				
 				//Update screen
 				SDL_RenderPresent(gRenderer);
 			}
@@ -568,6 +618,39 @@ bool LTimer::isPaused(){
 	return mPaused && mStarted;
 }
 
+Map::Map(){
+	static std::random_device tileType;
+	
+	for(int i = 0; i < Tile::ROWS; ++i){
+		for(int j = 0; j < Tile::COLS; ++j){
+			if(i%2 == 0 || j%2 == 0){
+				if((i == 0 && j == 0)
+					|| (i == 0 && j == Tile::COLS-1)
+					|| (i == Tile::ROWS-1 && j == 0)
+					|| (i == Tile::ROWS-1 && j == Tile::COLS-1)){
+					tileMap[j][i] = 0;
+				}else{
+					tileMap[j][i] = tileType()%2;
+				}
+			}else{
+				tileMap[j][i] = tileType()%2+2;
+			}
+		}
+	}
+}
+
+Tile* Map::getTile(int x, int y){
+	return tile[tileMap[x/Tile::WIDTH][y/Tile::HEIGHT]];
+}
+
+void Map::render(){
+	for(int i = 0; i < Tile::ROWS; ++i){
+		for(int j = 0; j < Tile::COLS; ++j){
+			gTerrainSheet.render(j*Tile::WIDTH, i*Tile::HEIGHT, &(tile[tileMap[j][i]]->t));
+		}
+	}
+}
+
 Player::Player(int id)
 {
 	//assigning player ID
@@ -576,11 +659,11 @@ Player::Player(int id)
     //Initialize the positions
     if(mPlayerID == 0){
     	mPosX = 0;
-    	mPosY = SCREEN_HEIGHT/2;
+    	mPosY = 0;
     }
     else if(mPlayerID == 1){
     	mPosX = SCREEN_WIDTH-PLAYER_WIDTH;
-    	mPosY = SCREEN_HEIGHT/2;
+    	mPosY = (SCREEN_HEIGHT-PLAYER_HEIGHT)/2;
     }   
 
     //Initialize the velocity
@@ -639,13 +722,15 @@ void Player::handleEvent(SDL_Event& e){
     }
 }
 
-void Player::move()
-{
+void Player::move(Map* map){
     //Move the Player left or right
     mPosX += mVelX;
     shiftColliders();
+	
     //If the Player went too far to the left or right
-    if((mPosX < 0) || (mPosX + PLAYER_WIDTH > SCREEN_WIDTH) || (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) ){
+    if((mPosX < 0) || (mPosX + PLAYER_WIDTH > SCREEN_WIDTH) || (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider()))
+		|| ((map->getTile(mPosX, mPosY))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m > 0)
+		|| ((map->getTile(mPosX, mPosY+PLAYER_HEIGHT))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_HEIGHT))->m > 0)){
         //Move back
         mPosX -= mVelX;
         shiftColliders();
@@ -655,7 +740,10 @@ void Player::move()
     mPosY += mVelY;
     shiftColliders();
     //If the Player went too far up or down
-    if((mPosY < 0)||(mPosY + PLAYER_HEIGHT > SCREEN_HEIGHT-SCOREBOARD_HEIGHT) || (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) ){
+
+    if((mPosY < 0)||(mPosY + PLAYER_HEIGHT > SCREEN_HEIGHT-SCOREBOARD_HEIGHT)|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider()))
+		|| ((map->getTile(mPosX, mPosY))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m > 0)
+		|| ((map->getTile(mPosX, mPosY+PLAYER_HEIGHT))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_HEIGHT))->m > 0)){
         //Move back
         mPosY -= mVelY;
         shiftColliders();
@@ -760,6 +848,9 @@ void PowerUp::render(){
     		break;
     }
 }
+void PowerUp::clear(){
+	printf("CLEAR\n");
+}
 
 bool init(){
 	//Initialization flag
@@ -825,6 +916,16 @@ bool loadMedia(){
 			printf( "Unable to render pause text texture!\n" );
 			success = false;
 		}
+	}
+	
+	if(!gTerrainSheet.loadFromFile("Assets/terrain.png")){
+		printf("Failed to load terrain sprite sheet!\n");
+		success = false;
+	}else{
+		tile[GRASS] = new Tile({0, 0, 32, 32}, 0, 0);
+		tile[BRICK] = new Tile({32, 0, 32, 32}, 2, 1);
+		tile[WATER] = new Tile({64, 0, 32, 32}, 1, 0);
+		tile[EMPTY] = new Tile({96, 0, 32, 32}, 3, 0);
 	}
 
 	//Load player textures
