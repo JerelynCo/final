@@ -27,6 +27,13 @@ enum Terrain{
 	EMPTY
 };
 
+enum Direction{
+	SOUTH,
+	WEST,
+	NORTH,
+	EAST
+};
+
 //Texture wrapper class
 class LTexture{
 	public:
@@ -105,7 +112,6 @@ class LTimer{
 
 struct Tile{
 		static const int LENGTH = 30, WIDTH = 30;
-		static const int ROWS = 20, COLS = 30;
 
 		SDL_Rect t;
 		const Uint8 m;
@@ -114,12 +120,16 @@ struct Tile{
 			t(tile), m(mobility) {};
 };
 
-class Map{
-		int tileMap[Tile::COLS][Tile::ROWS];
-	public:
-		Map();
-		Tile* getTile(int, int);
-		void render();
+struct Map{
+	static const int ROWS = 10, COLS = 30;
+	
+	Map();
+	Tile* tile(int, int);
+	void hit(int, int);
+	void render();
+	
+	private:
+		Tile* map[COLS][ROWS];
 };
 
 //Circle struct
@@ -144,7 +154,7 @@ class Player{
 		void handleEvent(SDL_Event& e);
 
 		//Moves the player
-		void move(Map*);
+		void move(Map&);
 
 		//Shows the player on the screen
 		void render();
@@ -159,21 +169,29 @@ class Player{
 
 		//The velocity of the player
 		int mVelX, mVelY;
+		
+		int dir;
 
 		//Player ID
 		int mPlayerID;
 
 		//the collider for the circle
         Circle mCollider;
-
+		
+		void shoot();
 };
 
-/*class Powers{
-	public:
-
-	private:
-
-};*/
+struct Bullet{
+	static const int LENGTH = 5, WIDTH = 5, VEL = 5;
+	double x, y;
+	int dir;
+	
+	Bullet(double xStart, double yStart, int direction):
+		x(xStart), y(yStart), dir(direction) {};
+		
+	bool move(Map&);
+	void render();
+};
 
 //Starts up SDL and creates window
 bool init();
@@ -206,12 +224,13 @@ LTexture gPauseTextTexture;
 
 ///Vectors for Players
 std::vector<Player> gPlayers;
+std::vector<Bullet> gBullets;
 
 //Global timer
 LTimer gTimer;
 
 LTexture gSpriteSheet;
-Tile* tile[4];
+Tile* gTiles[4];
 
 int main(int argc, char *args[]){	
 	gTimer.start();
@@ -285,7 +304,7 @@ int main(int argc, char *args[]){
 					}
 
 					//Clear screen
-					SDL_SetRenderDrawColor(gRenderer, 0xB4, 0xB4, 0xB4, 0xFF);
+					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 					SDL_RenderClear(gRenderer);
 					
 					map.render();
@@ -294,9 +313,17 @@ int main(int argc, char *args[]){
 					gBombTexture.render(50,200);
 					gShieldTexture.render(10,200);
 					gLifeTexture.render(100,200);
-
+					
+					for(int i = 0; i < gBullets.size(); ++i){
+						if(gBullets[i].move(map)){
+							gBullets[i].render();
+						}else{
+							gBullets.erase(gBullets.begin()+i);
+						}
+					}
+					
 					for(int i = 0; i < gPlayers.size(); i++){
-						gPlayers[i].move(&map);
+						gPlayers[i].move(map);
 						gPlayers[i].render();
 					}
 				}
@@ -535,32 +562,43 @@ bool LTimer::isPaused(){
 Map::Map(){
 	static std::random_device tileType;
 	
-	for(int i = 0; i < Tile::ROWS; ++i){
-		for(int j = 0; j < Tile::COLS; ++j){
+	for(int i = 0; i < ROWS; ++i){
+		for(int j = 0; j < COLS; ++j){
 			if(i%2 == 0 || j%2 == 0){
 				if((i == 0 && j == 0)
-					|| (i == 0 && j == Tile::COLS-1)
-					|| (i == Tile::ROWS-1 && j == 0)
-					|| (i == Tile::ROWS-1 && j == Tile::COLS-1)){
-					tileMap[j][i] = 0;
+					|| (i == 0 && j == COLS-1)
+					|| (i == ROWS-1 && j == 0)
+					|| (i == ROWS-1 && j == COLS-1)){
+					map[j][i] = gTiles[GRASS];
 				}else{
-					tileMap[j][i] = tileType()%2;
+					map[j][i] = gTiles[tileType()%2];
 				}
 			}else{
-				tileMap[j][i] = tileType()%2+2;
+				map[j][i] = gTiles[tileType()%2+2];
 			}
 		}
 	}
 }
 
-Tile* Map::getTile(int x, int y){
-	return tile[tileMap[x/Tile::WIDTH][y/Tile::LENGTH]];
+Tile* Map::tile(int x, int y){
+	if(x >= 0 && x < Tile::WIDTH*Map::COLS
+		&& y >= 0 && y < Tile::LENGTH*Map::ROWS){
+		return map[x/Tile::WIDTH][y/Tile::LENGTH];
+	}else{
+		return gTiles[EMPTY];
+	}
+}
+
+void Map::hit(int x, int y){
+	if(tile(x, y) == gTiles[BRICK]){
+		map[x/Tile::WIDTH][y/Tile::LENGTH] = gTiles[GRASS];
+	}
 }
 
 void Map::render(){
-	for(int i = 0; i < Tile::ROWS; ++i){
-		for(int j = 0; j < Tile::COLS; ++j){
-			gSpriteSheet.render(j*Tile::WIDTH, i*Tile::LENGTH, &(tile[tileMap[j][i]]->t));
+	for(int i = 0; i < ROWS; ++i){
+		for(int j = 0; j < COLS; ++j){
+			gSpriteSheet.render(j *Tile::WIDTH, i*Tile::LENGTH, &(map[j][i]->t));
 		}
 	}
 }
@@ -579,61 +617,79 @@ Player::Player(int ID){
     mCollider.y = mPosY;
     mCollider.r = PLAYER_WIDTH/2;
 
+	dir = SOUTH;
+	
     mPlayerID = ID;
 }
 
 void Player::handleEvent(SDL_Event& e){
 	//Controls: WASD and Arrow keys
-	if(e.type == SDL_KEYDOWN && e.key.repeat == 0){
-    	if(mPlayerID == 0){
-	        switch( e.key.keysym.sym ){
-	            case SDLK_UP: mVelY -= PLAYER_VEL; break;
-	            case SDLK_DOWN: mVelY += PLAYER_VEL; break;
-	            case SDLK_LEFT: mVelX -= PLAYER_VEL; break;
-	            case SDLK_RIGHT: mVelX += PLAYER_VEL; break;
+	if(e.type == SDL_KEYDOWN){
+		if(mPlayerID == 0){
+			switch(e.key.keysym.sym){
+	            case SDLK_i: mVelY = -PLAYER_VEL; break;
+	            case SDLK_k: mVelY = PLAYER_VEL; break;
+	            case SDLK_l: mVelX = PLAYER_VEL; break;
+	            case SDLK_j: mVelX = -PLAYER_VEL; break;
+				case SDLK_n: if(e.key.repeat == 0){shoot();} break;
 	        }
     	}
-    	if(mPlayerID == 1){
-	        switch( e.key.keysym.sym ){
-	            case SDLK_w: mVelY -= PLAYER_VEL; break;
-	            case SDLK_s: mVelY += PLAYER_VEL; break;
-	            case SDLK_a: mVelX -= PLAYER_VEL; break;
-	            case SDLK_d: mVelX += PLAYER_VEL; break;
+		if(mPlayerID == 1){
+			switch(e.key.keysym.sym){
+	            case SDLK_w: mVelY = -PLAYER_VEL; break;
+	            case SDLK_s: mVelY = PLAYER_VEL; break;
+	            case SDLK_d: mVelX = PLAYER_VEL; break;
+	            case SDLK_a: mVelX = -PLAYER_VEL; break;
+				case SDLK_c: if(e.key.repeat == 0){shoot();} break;
 	        }
     	}
-    }
-    //If a key was released
-    else if(e.type == SDL_KEYUP && e.key.repeat == 0){
-        if(mPlayerID == 0){
-        	//Adjust the velocity
-	        switch( e.key.keysym.sym ){
-	            case SDLK_UP: mVelY += PLAYER_VEL; break;
-	            case SDLK_DOWN: mVelY -= PLAYER_VEL; break;
-	            case SDLK_LEFT: mVelX += PLAYER_VEL; break;
-	            case SDLK_RIGHT: mVelX -= PLAYER_VEL; break;
+		
+		if(mPlayerID == 0){
+			switch(e.key.keysym.sym){
+				case SDLK_i: dir = NORTH; break;
+				case SDLK_k: dir = SOUTH; break;
+				case SDLK_j: dir = WEST; break;
+				case SDLK_l: dir = EAST; break;
+			}
+    	}
+		if(mPlayerID == 1){
+			switch(e.key.keysym.sym){
+				case SDLK_w: dir = NORTH; break;
+				case SDLK_s: dir = SOUTH; break;
+				case SDLK_a: dir = WEST; break;
+				case SDLK_d: dir = EAST; break;
+			}
+    	}
+    }else if(e.type == SDL_KEYUP){
+		if(mPlayerID == 0){
+			switch(e.key.keysym.sym){
+	            case SDLK_i: mVelY = 0; break;
+	            case SDLK_k: mVelY = 0; break;
+	            case SDLK_l: mVelX = 0; break;
+	            case SDLK_j: mVelX = 0; break;
 	        }
     	}
-    	if(mPlayerID == 1){
-        	//Adjust the velocity
-	        switch( e.key.keysym.sym ){
-	            case SDLK_w: mVelY += PLAYER_VEL; break;
-	            case SDLK_s: mVelY -= PLAYER_VEL; break;
-	            case SDLK_a: mVelX += PLAYER_VEL; break;
-	            case SDLK_d: mVelX -= PLAYER_VEL; break;
+		if(mPlayerID == 1){
+			switch(e.key.keysym.sym){
+	            case SDLK_w: mVelY = 0; break;
+	            case SDLK_s: mVelY = 0; break;
+	            case SDLK_d: mVelX = 0; break;
+	            case SDLK_a: mVelX = 0; break;
 	        }
     	}
-    }
+	}
 }
 
-void Player::move(Map* map){
+void Player::move(Map& map){
     //Move the Player left or right
     mPosX += mVelX;
     shiftColliders();
 	
     //If the Player went too far to the left or right
-    if((mPosX < 0) || (mPosX + PLAYER_WIDTH > SCREEN_WIDTH)
-		|| ((map->getTile(mPosX, mPosY))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m > 0)
-		|| ((map->getTile(mPosX, mPosY+PLAYER_LENGTH))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m > 0)){
+    if((map.tile(mPosX, mPosY))->m > 0
+		|| (map.tile(mPosX+PLAYER_WIDTH, mPosY))->m > 0
+		|| (map.tile(mPosX, mPosY+PLAYER_LENGTH))->m > 0
+		|| (map.tile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m > 0){
         //Move back
         mPosX -= mVelX;
         shiftColliders();
@@ -642,14 +698,20 @@ void Player::move(Map* map){
     //Move the Player up or down
     mPosY += mVelY;
     shiftColliders();
+	
     //If the Player went too far up or down
-    if((mPosY < 0)||(mPosY + PLAYER_LENGTH > SCREEN_LENGTH)
-		|| ((map->getTile(mPosX, mPosY))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m > 0)
-		|| ((map->getTile(mPosX, mPosY+PLAYER_LENGTH))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m > 0)){
+    if((map.tile(mPosX, mPosY))->m > 0
+		|| (map.tile(mPosX+PLAYER_WIDTH, mPosY))->m > 0
+		|| (map.tile(mPosX, mPosY+PLAYER_LENGTH))->m > 0
+		|| (map.tile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m > 0){
         //Move back
         mPosY -= mVelY;
         shiftColliders();
     }
+}
+
+void Player::shoot(){
+	gBullets.emplace_back(mPosX+PLAYER_WIDTH/2, mPosY+PLAYER_LENGTH/2, dir);
 }
 
 Circle& Player::getCollider(){
@@ -665,12 +727,33 @@ void Player::shiftColliders(){
 void Player::render(){
     //Show the Player
     if(mPlayerID == 0){
-    	gPlayerOneTexture.render(mPosX, mPosY);
+    	gPlayerOneTexture.render(mPosX, mPosY, NULL, 90*dir);
     }
 	if(mPlayerID == 1){
-		gPlayerTwoTexture.render(mPosX, mPosY);
+		gPlayerTwoTexture.render(mPosX, mPosY, NULL, 90*dir);
 	}
+}
 
+bool Bullet::move(Map& map){
+	x += VEL*cos(PI*(dir+1)/2);
+	y += VEL*sin(PI*(dir+1)/2);
+	
+	if(map.tile(x, y) == gTiles[BRICK]){
+		map.hit(x, y);
+		return false;
+	}else if(map.tile(x+WIDTH, y+LENGTH) == gTiles[BRICK]){
+		map.hit(x+WIDTH, y+LENGTH);
+		return false;
+	}else if(map.tile(x, y) == gTiles[EMPTY]){
+		return false;
+	}
+	
+	return true;
+}
+
+void Bullet::render(){
+	SDL_Rect bullet = {(int) x, (int) y, WIDTH, LENGTH};
+	SDL_RenderFillRect(gRenderer, &bullet);
 }
 
 bool init(){
@@ -743,10 +826,10 @@ bool loadMedia(){
 		printf("Failed to load terrain sprite sheet!\n");
 		success = false;
 	}else{
-		tile[GRASS] = new Tile({0, 0, 32, 32}, 0);
-		tile[BRICK] = new Tile({32, 0, 32, 32}, 2);
-		tile[WATER] = new Tile({64, 0, 32, 32}, 1);
-		tile[EMPTY] = new Tile({96, 0, 32, 32}, 3);
+		gTiles[GRASS] = new Tile({0, 0, 32, 32}, 0);
+		gTiles[BRICK] = new Tile({32, 0, 32, 32}, 2);
+		gTiles[WATER] = new Tile({64, 0, 32, 32}, 1);
+		gTiles[EMPTY] = new Tile({96, 0, 32, 32}, 3);
 	}
 
 	//Load player textures
@@ -787,9 +870,14 @@ void close(){
 	//Free loaded images
 	gPauseTextTexture.free();
 	gTimeTextTexture.free();
+	
 	gBombTexture.free();
+	gShieldTexture.free();
+	gLifeTexture.free();
+	
 	gPlayerOneTexture.free();
 	gPlayerTwoTexture.free();
+	
 	gSpriteSheet.free();
 
 	//Free global font
