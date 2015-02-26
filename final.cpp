@@ -21,20 +21,17 @@ const int SCREEN_WIDTH = 1200;
 const int SCREEN_LENGTH = 600;
 
 enum Terrain{
-	GRASS,
-	BRICK,
-	WATER,
-	EMPTY
+	GRASS, BRICK, WATER, EMPTY 
 };
 
 enum Direction{
-	SOUTH,
-	WEST,
-	NORTH,
-	EAST
+	SOUTH, WEST, NORTH, EAST
 };
 
-//Texture wrapper class
+enum Controls{
+	UP, LEFT, DOWN, RIGHT, SHOOT
+};
+
 class LTexture{
 	public:
 		//Initialize variables
@@ -64,7 +61,7 @@ class LTexture{
 		void setAlpha(Uint8 alpha);
 		
 		//Renders texture at given point
-		void render(int, int, SDL_Rect* = NULL, double = 0.0, SDL_Point* = NULL, SDL_RendererFlip = SDL_FLIP_NONE);
+		void render(SDL_Rect*, SDL_Rect* = NULL, double = 0.0, SDL_Point* = NULL, SDL_RendererFlip = SDL_FLIP_NONE);
 		
 		//Gets image dimensions
 		int getWidth();
@@ -79,7 +76,6 @@ class LTexture{
 		int mHeight;
 };
 
-//Timer wrapper class
 class LTimer{
 	public:
 		//Initializes variables
@@ -111,72 +107,47 @@ class LTimer{
 };
 
 struct Tile{
-		static const int LENGTH = 30, WIDTH = 30;
+	static const int LENGTH = 30, WIDTH = 30;
 
-		SDL_Rect t;
-		const Uint8 m;
-		
-		Tile(SDL_Rect tile, Uint8 mobility):
-			t(tile), m(mobility) {};
+	SDL_Rect t;
+	const Uint8 m;
+	
+	Tile(SDL_Rect tile, Uint8 mobility):
+		t(tile), m(mobility) {};
 };
 
 struct Map{
-	static const int ROWS = 10, COLS = 30;
+	static const int ROWS = 25, COLS = 25;
 	
 	Map();
+	
 	Tile* tile(int, int);
 	void hit(int, int);
 	void render();
 	
 	private:
+		std::random_device tileType;
 		Tile* map[COLS][ROWS];
+		SDL_Rect t;
 };
 
-//Circle struct
-struct Circle{
-    int x, y;
-    int r;
-};
+struct Player{
+	static const int WIDTH = 20, LENGTH = 20;
+	static const int VEL = 2;
 
-//Player class
-class Player{
-	public:
-		//The dimensions of the player
-		static const int PLAYER_WIDTH = 20, PLAYER_LENGTH = 20;
-		
-		//Maximum axis velocity of the player
-		static const int PLAYER_VEL = 2;
+	Player(LTexture* texture, SDL_Keycode up, SDL_Keycode left, SDL_Keycode down, SDL_Keycode right, SDL_Keycode shoot):
+		p{(Tile::WIDTH-WIDTH)/2, (Tile::LENGTH-LENGTH)/2, texture->getWidth(), texture->getHeight()},
+		vx(0), vy(0), dir(SOUTH), tex(texture), con{up, left, down, right, shoot} {};
 
-		//Initializes the variables
-		Player(int ID);
-
-		//Takes key presses and adjusts the player's velocity
-		void handleEvent(SDL_Event& e);
-
-		//Moves the player
-		void move(Map&);
-
-		//Shows the player on the screen
-		void render();
-
-		Circle& getCollider();
-
-        void shiftColliders();
-		
+	void handleEvent(SDL_Event& e);
+	void move(Map&);
+	void render();
+	
     private:
-		//The X and Y offsets of the player
-		int mPosX, mPosY;
-
-		//The velocity of the player
-		int mVelX, mVelY;
-		
-		int dir;
-
-		//Player ID
-		int mPlayerID;
-
-		//the collider for the circle
-        Circle mCollider;
+		SDL_Rect p;
+		LTexture* tex;
+		int vx, vy, dir;
+		SDL_Keycode con[5];
 		
 		void shoot();
 };
@@ -222,11 +193,9 @@ LTexture gLifeTexture;
 LTexture gTimeTextTexture;
 LTexture gPauseTextTexture;
 
-///Vectors for Players
 std::vector<Player> gPlayers;
 std::vector<Bullet> gBullets;
 
-//Global timer
 LTimer gTimer;
 
 LTexture gSpriteSheet;
@@ -249,10 +218,8 @@ int main(int argc, char *args[]){
 			bool quit = false;
 			
 			//Show players
-			Player playerOne(0);
-			gPlayers.push_back(playerOne);
-			Player playerTwo(1);
-			gPlayers.push_back(playerTwo);
+			gPlayers.emplace_back(&gPlayerOneTexture, SDLK_w, SDLK_a, SDLK_s, SDLK_d, SDLK_c);
+			gPlayers.emplace_back(&gPlayerTwoTexture, SDLK_i, SDLK_j, SDLK_k, SDLK_l, SDLK_n);
 			
 			//Event handler
 			SDL_Event e;
@@ -309,10 +276,10 @@ int main(int argc, char *args[]){
 					
 					map.render();
 					
-					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth()) - 50, 0);
-					gBombTexture.render(50,200);
-					gShieldTexture.render(10,200);
-					gLifeTexture.render(100,200);
+					gTimeTextTexture.render(new SDL_Rect{(SCREEN_WIDTH-gTimeTextTexture.getWidth())-50, 0, 0, 0});
+					gBombTexture.render(new SDL_Rect{50, 200, 0, 0});
+					gShieldTexture.render(new SDL_Rect{10, 200, 0, 0});
+					gLifeTexture.render(new SDL_Rect{100, 200, 0, 0});
 					
 					for(int i = 0; i < gBullets.size(); ++i){
 						if(gBullets[i].move(map)){
@@ -331,7 +298,8 @@ int main(int argc, char *args[]){
 				else{
 					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 					SDL_RenderClear(gRenderer);
-					gPauseTextTexture.render((SCREEN_WIDTH-gPauseTextTexture.getWidth())/2, (SCREEN_LENGTH-gPauseTextTexture.getHeight())/2);
+					gPauseTextTexture.render(new SDL_Rect{(SCREEN_WIDTH-gPauseTextTexture.getWidth())/2,
+						(SCREEN_LENGTH-gPauseTextTexture.getHeight())/2, 0, 0});
 
 				}
 				
@@ -449,18 +417,15 @@ void LTexture::setAlpha(Uint8 alpha){
 	SDL_SetTextureAlphaMod(mTexture, alpha);
 }
 
-void LTexture::render(int x, int y, SDL_Rect* clip, double angle, SDL_Point* center, SDL_RendererFlip flip){
-	//Set rendering space and render to screen
-	SDL_Rect renderQuad = {x, y, mWidth, mHeight};
-	
+void LTexture::render(SDL_Rect* dst, SDL_Rect* src, double angle, SDL_Point* center, SDL_RendererFlip flip){
 	//Set clip rendering dimensions
-	if(clip != NULL){
-		renderQuad.w = clip->w;
-		renderQuad.h = clip->h;
+	if(dst->w == 0 || dst->h == 0){
+		dst->w = mWidth;
+		dst->h = mHeight;
 	}
 	
 	//Render to screen
-	SDL_RenderCopyEx(gRenderer, mTexture, clip, &renderQuad, angle, center, flip);
+	SDL_RenderCopyEx(gRenderer, mTexture, src, dst, angle, center, flip);
 }	
 
 int LTexture::getWidth(){
@@ -560,8 +525,6 @@ bool LTimer::isPaused(){
 }
 
 Map::Map(){
-	static std::random_device tileType;
-	
 	for(int i = 0; i < ROWS; ++i){
 		for(int j = 0; j < COLS; ++j){
 			if(i%2 == 0 || j%2 == 0){
@@ -578,6 +541,8 @@ Map::Map(){
 			}
 		}
 	}
+	
+	t = {0, 0, Tile::WIDTH, Tile::LENGTH};
 }
 
 Tile* Map::tile(int x, int y){
@@ -596,142 +561,59 @@ void Map::hit(int x, int y){
 }
 
 void Map::render(){
+	t.x = 0; t.y = 0;
+	
 	for(int i = 0; i < ROWS; ++i){
 		for(int j = 0; j < COLS; ++j){
-			gSpriteSheet.render(j *Tile::WIDTH, i*Tile::LENGTH, &(map[j][i]->t));
+			
+			t.x = j*Tile::WIDTH;
+			t.y = i*Tile::LENGTH;
+			gSpriteSheet.render(&t, &(map[j][i]->t));
 		}
 	}
 }
 
-Player::Player(int ID){
-    //Initialize the offsets
-    mPosX = 0;
-    mPosY = 0;
-
-    //Initialize the velocity
-    mVelX = 0;
-    mVelY = 0;
-
-    //for the colliders
-    mCollider.x = mPosX;
-    mCollider.y = mPosY;
-    mCollider.r = PLAYER_WIDTH/2;
-
-	dir = SOUTH;
-	
-    mPlayerID = ID;
-}
-
 void Player::handleEvent(SDL_Event& e){
-	//Controls: WASD and Arrow keys
-	if(e.type == SDL_KEYDOWN){
-		if(mPlayerID == 0){
-			switch(e.key.keysym.sym){
-	            case SDLK_i: mVelY = -PLAYER_VEL; break;
-	            case SDLK_k: mVelY = PLAYER_VEL; break;
-	            case SDLK_l: mVelX = PLAYER_VEL; break;
-	            case SDLK_j: mVelX = -PLAYER_VEL; break;
-				case SDLK_n: if(e.key.repeat == 0){shoot();} break;
-	        }
-    	}
-		if(mPlayerID == 1){
-			switch(e.key.keysym.sym){
-	            case SDLK_w: mVelY = -PLAYER_VEL; break;
-	            case SDLK_s: mVelY = PLAYER_VEL; break;
-	            case SDLK_d: mVelX = PLAYER_VEL; break;
-	            case SDLK_a: mVelX = -PLAYER_VEL; break;
-				case SDLK_c: if(e.key.repeat == 0){shoot();} break;
-	        }
-    	}
-		
-		if(mPlayerID == 0){
-			switch(e.key.keysym.sym){
-				case SDLK_i: dir = NORTH; break;
-				case SDLK_k: dir = SOUTH; break;
-				case SDLK_j: dir = WEST; break;
-				case SDLK_l: dir = EAST; break;
-			}
-    	}
-		if(mPlayerID == 1){
-			switch(e.key.keysym.sym){
-				case SDLK_w: dir = NORTH; break;
-				case SDLK_s: dir = SOUTH; break;
-				case SDLK_a: dir = WEST; break;
-				case SDLK_d: dir = EAST; break;
-			}
-    	}
+	if(e.type == SDL_KEYDOWN && e.key.repeat == 0){
+		if(e.key.keysym.sym == con[UP]){vy -= VEL; dir = NORTH;}
+		else if(e.key.keysym.sym == con[LEFT]){vx -= VEL; dir = WEST;}
+		else if(e.key.keysym.sym == con[DOWN]){vy += VEL; dir = SOUTH;}
+		else if(e.key.keysym.sym == con[RIGHT]){vx += VEL; dir = EAST;}
+		else if(e.key.keysym.sym == con[SHOOT]){shoot();}
     }else if(e.type == SDL_KEYUP){
-		if(mPlayerID == 0){
-			switch(e.key.keysym.sym){
-	            case SDLK_i: mVelY = 0; break;
-	            case SDLK_k: mVelY = 0; break;
-	            case SDLK_l: mVelX = 0; break;
-	            case SDLK_j: mVelX = 0; break;
-	        }
-    	}
-		if(mPlayerID == 1){
-			switch(e.key.keysym.sym){
-	            case SDLK_w: mVelY = 0; break;
-	            case SDLK_s: mVelY = 0; break;
-	            case SDLK_d: mVelX = 0; break;
-	            case SDLK_a: mVelX = 0; break;
-	        }
-    	}
+		if(e.key.keysym.sym == con[UP]){vy += VEL;}
+		else if(e.key.keysym.sym == con[LEFT]){vx += VEL;}
+		else if(e.key.keysym.sym == con[DOWN]){vy -= VEL;}
+		else if(e.key.keysym.sym == con[RIGHT]){vx -= VEL;}
 	}
 }
 
 void Player::move(Map& map){
-    //Move the Player left or right
-    mPosX += mVelX;
-    shiftColliders();
+    p.x += vx;
 	
-    //If the Player went too far to the left or right
-    if((map.tile(mPosX, mPosY))->m > 0
-		|| (map.tile(mPosX+PLAYER_WIDTH, mPosY))->m > 0
-		|| (map.tile(mPosX, mPosY+PLAYER_LENGTH))->m > 0
-		|| (map.tile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m > 0){
-        //Move back
-        mPosX -= mVelX;
-        shiftColliders();
+    if((map.tile(p.x, p.y))->m > 0
+		|| (map.tile(p.x+WIDTH, p.y))->m > 0
+		|| (map.tile(p.x, p.y+LENGTH))->m > 0
+		|| (map.tile(p.x+WIDTH, p.y+LENGTH))->m > 0){
+        p.x -= vx;
     }
 
-    //Move the Player up or down
-    mPosY += mVelY;
-    shiftColliders();
+    p.y += vy;
 	
-    //If the Player went too far up or down
-    if((map.tile(mPosX, mPosY))->m > 0
-		|| (map.tile(mPosX+PLAYER_WIDTH, mPosY))->m > 0
-		|| (map.tile(mPosX, mPosY+PLAYER_LENGTH))->m > 0
-		|| (map.tile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_LENGTH))->m > 0){
-        //Move back
-        mPosY -= mVelY;
-        shiftColliders();
+    if((map.tile(p.x, p.y))->m > 0
+		|| (map.tile(p.x+WIDTH, p.y))->m > 0
+		|| (map.tile(p.x, p.y+LENGTH))->m > 0
+		|| (map.tile(p.x+WIDTH, p.y+LENGTH))->m > 0){
+        p.y -= vy;
     }
 }
 
 void Player::shoot(){
-	gBullets.emplace_back(mPosX+PLAYER_WIDTH/2, mPosY+PLAYER_LENGTH/2, dir);
-}
-
-Circle& Player::getCollider(){
-    return mCollider;
-}
-
-void Player::shiftColliders(){
-	//Align collider to center of ball
-	mCollider.x = mPosX;
-	mCollider.y = mPosY;
+	gBullets.emplace_back(p.x+WIDTH/2, p.y+LENGTH/2, dir);
 }
 
 void Player::render(){
-    //Show the Player
-    if(mPlayerID == 0){
-    	gPlayerOneTexture.render(mPosX, mPosY, NULL, 90*dir);
-    }
-	if(mPlayerID == 1){
-		gPlayerTwoTexture.render(mPosX, mPosY, NULL, 90*dir);
-	}
+    tex->render(&p, NULL, 90*dir);
 }
 
 bool Bullet::move(Map& map){
@@ -857,13 +739,6 @@ bool loadMedia(){
 	}
 	
 	return success;
-}
-
-bool checkCollision(Circle& c1, Circle& c2){
-	if(sqrt(pow(c1.x-c2.x, 2)+pow(c1.y-c2.y, 2)) < c1.r+c2.r){
-		return true;
-	}
-	return false;
 }
 
 void close(){
