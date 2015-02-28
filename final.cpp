@@ -126,7 +126,6 @@ struct Map{
 	void render();
 	
 	private:
-		std::random_device tileType;
 		Tile* map[COLS][ROWS];
 		SDL_Rect t;
 };
@@ -135,19 +134,20 @@ struct Player{
 	static const int WIDTH = 20, LENGTH = 20;
 	static const int VEL = 2;
 
-	Player(LTexture* texture, SDL_Keycode up, SDL_Keycode left, SDL_Keycode down, SDL_Keycode right, SDL_Keycode shoot):
+	Player(LTexture* texture, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot):
 		p{(Tile::WIDTH-WIDTH)/2, (Tile::LENGTH-LENGTH)/2, texture->getWidth(), texture->getHeight()},
-		vx(0), vy(0), dir(SOUTH), tex(texture), con{up, left, down, right, shoot} {};
+		dir(SOUTH), tex(texture), con{up, left, down, right, shoot} {};
 
-	void handleEvent(SDL_Event& e);
-	void move(Map&);
+	void act(const Uint8*);
+	void act(SDL_Scancode);
+	void move(int, int);
 	void render();
 	
     private:
+		int dir;
 		SDL_Rect p;
 		LTexture* tex;
-		int vx, vy, dir;
-		SDL_Keycode con[5];
+		SDL_Scancode con[5];
 		
 		void shoot();
 };
@@ -160,7 +160,7 @@ struct Bullet{
 	Bullet(double xStart, double yStart, int direction):
 		x(xStart), y(yStart), dir(direction) {};
 		
-	bool move(Map&);
+	bool move();
 	void render();
 };
 
@@ -193,6 +193,9 @@ LTexture gLifeTexture;
 LTexture gTimeTextTexture;
 LTexture gPauseTextTexture;
 
+std::vector<Map> gLevels;
+int gLevel = 0;
+
 std::vector<Player> gPlayers;
 std::vector<Bullet> gBullets;
 
@@ -217,53 +220,60 @@ int main(int argc, char *args[]){
 			//Main loop flag
 			bool quit = false;
 			
-			//Show players
-			gPlayers.emplace_back(&gPlayerOneTexture, SDLK_w, SDLK_a, SDLK_s, SDLK_d, SDLK_c);
-			gPlayers.emplace_back(&gPlayerTwoTexture, SDLK_i, SDLK_j, SDLK_k, SDLK_l, SDLK_n);
+			//Create players
+			gPlayers.emplace_back(&gPlayerOneTexture, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C);
+			gPlayers.emplace_back(&gPlayerTwoTexture, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N);
 			
 			//Event handler
-			SDL_Event e;
+			SDL_Event event;
+			const Uint8* state = SDL_GetKeyboardState(NULL);
 
 			//Set text color as black
-			SDL_Color textColor = { 0, 0, 0, 255 };
+			SDL_Color textColor = {0, 0, 0, 255};
 
 			//In memory text stream
 			std::stringstream timeText;
-
+			
+			const int LEVELS = 1;
+			for(int i = 0; i < LEVELS; ++i){
+				gLevels.emplace_back();
+			}
+			
 			//start global game timer
 			gTimer.start();
 			
-			Map map;
-			
 			//While application is running
 			while(!quit){									
-				//Handle events on queue
-				while(SDL_PollEvent(&e) != 0){
+				while(SDL_PollEvent(&event)){
 					//User requests quit
-					if(e.type == SDL_QUIT){
+					if(event.type == SDL_QUIT){
 						quit = true;
 					}
-					//Reset start time on return keypress
-					else if(e.type == SDL_KEYDOWN){
-						//Pause/unpause
-						if(e.key.keysym.sym == SDLK_p){
+					//Pause/Unpause
+					if(event.type == SDL_KEYDOWN){
+						if(event.key.keysym.sym == SDLK_p){
 							if(gTimer.isPaused()){
 								gTimer.unpause();
-							}
-							else{
+							}else{
 								gTimer.pause();
+							}
+
+						}else if(event.key.repeat == 0){
+							for(int i = 0; i < gPlayers.size(); ++i){
+								gPlayers[i].act(event.key.keysym.scancode);
 							}
 						}
 					}
-					for(int i = 0; i < gPlayers.size(); i++){
-						gPlayers[i].handleEvent(e);
-					}
+				}
+				
+				for(int i = 0; i < gPlayers.size(); ++i){
+					gPlayers[i].act(state);
 				}
 				
 				if(gTimer.isStarted() && !gTimer.isPaused()){
 					//Set text to be rendered
 					timeText.str( "" );
-					timeText << "Time: " << (gTimer.getTicks() / 1000);
+					timeText << "Time: " << (gTimer.getTicks()/1000);
 
 					//Render text
 					if(!gTimeTextTexture.loadFromRenderedText(timeText.str().c_str(), textColor)){
@@ -274,7 +284,7 @@ int main(int argc, char *args[]){
 					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 					SDL_RenderClear(gRenderer);
 					
-					map.render();
+					gLevels[gLevel].render();
 					
 					gTimeTextTexture.render(new SDL_Rect{(SCREEN_WIDTH-gTimeTextTexture.getWidth())-50, 0, 0, 0});
 					gBombTexture.render(new SDL_Rect{50, 200, 0, 0});
@@ -282,7 +292,7 @@ int main(int argc, char *args[]){
 					gLifeTexture.render(new SDL_Rect{100, 200, 0, 0});
 					
 					for(int i = 0; i < gBullets.size(); ++i){
-						if(gBullets[i].move(map)){
+						if(gBullets[i].move()){
 							gBullets[i].render();
 						}else{
 							gBullets.erase(gBullets.begin()+i);
@@ -290,7 +300,6 @@ int main(int argc, char *args[]){
 					}
 					
 					for(int i = 0; i < gPlayers.size(); i++){
-						gPlayers[i].move(map);
 						gPlayers[i].render();
 					}
 				}
@@ -525,6 +534,8 @@ bool LTimer::isPaused(){
 }
 
 Map::Map(){
+	std::random_device type;
+	
 	for(int i = 0; i < ROWS; ++i){
 		for(int j = 0; j < COLS; ++j){
 			if(i%2 == 0 || j%2 == 0){
@@ -534,10 +545,10 @@ Map::Map(){
 					|| (i == ROWS-1 && j == COLS-1)){
 					map[j][i] = gTiles[GRASS];
 				}else{
-					map[j][i] = gTiles[tileType()%2];
+					map[j][i] = gTiles[type()%2];
 				}
 			}else{
-				map[j][i] = gTiles[tileType()%2+2];
+				map[j][i] = gTiles[type()%2+2];
 			}
 		}
 	}
@@ -561,11 +572,8 @@ void Map::hit(int x, int y){
 }
 
 void Map::render(){
-	t.x = 0; t.y = 0;
-	
 	for(int i = 0; i < ROWS; ++i){
 		for(int j = 0; j < COLS; ++j){
-			
 			t.x = j*Tile::WIDTH;
 			t.y = i*Tile::LENGTH;
 			gSpriteSheet.render(&t, &(map[j][i]->t));
@@ -573,37 +581,33 @@ void Map::render(){
 	}
 }
 
-void Player::handleEvent(SDL_Event& e){
-	if(e.type == SDL_KEYDOWN && e.key.repeat == 0){
-		if(e.key.keysym.sym == con[UP]){vy -= VEL; dir = NORTH;}
-		else if(e.key.keysym.sym == con[LEFT]){vx -= VEL; dir = WEST;}
-		else if(e.key.keysym.sym == con[DOWN]){vy += VEL; dir = SOUTH;}
-		else if(e.key.keysym.sym == con[RIGHT]){vx += VEL; dir = EAST;}
-		else if(e.key.keysym.sym == con[SHOOT]){shoot();}
-    }else if(e.type == SDL_KEYUP){
-		if(e.key.keysym.sym == con[UP]){vy += VEL;}
-		else if(e.key.keysym.sym == con[LEFT]){vx += VEL;}
-		else if(e.key.keysym.sym == con[DOWN]){vy -= VEL;}
-		else if(e.key.keysym.sym == con[RIGHT]){vx -= VEL;}
-	}
+void Player::act(const Uint8* state){
+	if(state[con[UP]]){move(0, -VEL); dir = NORTH;}
+	if(state[con[LEFT]]){move(-VEL, 0); dir = WEST;}
+	if(state[con[DOWN]]){move(0, VEL); dir = SOUTH;}
+	if(state[con[RIGHT]]){move(VEL, 0); dir = EAST;}
 }
 
-void Player::move(Map& map){
+void Player::act(SDL_Scancode key){
+	if(key == con[SHOOT]){shoot();}
+}
+
+void Player::move(int vx, int vy){
     p.x += vx;
 	
-    if((map.tile(p.x, p.y))->m > 0
-		|| (map.tile(p.x+WIDTH, p.y))->m > 0
-		|| (map.tile(p.x, p.y+LENGTH))->m > 0
-		|| (map.tile(p.x+WIDTH, p.y+LENGTH))->m > 0){
+    if((gLevels[gLevel].tile(p.x, p.y))->m > 0
+		|| (gLevels[gLevel].tile(p.x+WIDTH, p.y))->m > 0
+		|| (gLevels[gLevel].tile(p.x, p.y+LENGTH))->m > 0
+		|| (gLevels[gLevel].tile(p.x+WIDTH, p.y+LENGTH))->m > 0){
         p.x -= vx;
     }
 
     p.y += vy;
 	
-    if((map.tile(p.x, p.y))->m > 0
-		|| (map.tile(p.x+WIDTH, p.y))->m > 0
-		|| (map.tile(p.x, p.y+LENGTH))->m > 0
-		|| (map.tile(p.x+WIDTH, p.y+LENGTH))->m > 0){
+    if((gLevels[gLevel].tile(p.x, p.y))->m > 0
+		|| (gLevels[gLevel].tile(p.x+WIDTH, p.y))->m > 0
+		|| (gLevels[gLevel].tile(p.x, p.y+LENGTH))->m > 0
+		|| (gLevels[gLevel].tile(p.x+WIDTH, p.y+LENGTH))->m > 0){
         p.y -= vy;
     }
 }
@@ -616,17 +620,17 @@ void Player::render(){
     tex->render(&p, NULL, 90*dir);
 }
 
-bool Bullet::move(Map& map){
+bool Bullet::move(){
 	x += VEL*cos(PI*(dir+1)/2);
 	y += VEL*sin(PI*(dir+1)/2);
 	
-	if(map.tile(x, y) == gTiles[BRICK]){
-		map.hit(x, y);
+	if(gLevels[gLevel].tile(x, y) == gTiles[BRICK]){
+		gLevels[gLevel].hit(x, y);
 		return false;
-	}else if(map.tile(x+WIDTH, y+LENGTH) == gTiles[BRICK]){
-		map.hit(x+WIDTH, y+LENGTH);
+	}else if(gLevels[gLevel].tile(x+WIDTH, y+LENGTH) == gTiles[BRICK]){
+		gLevels[gLevel].hit(x+WIDTH, y+LENGTH);
 		return false;
-	}else if(map.tile(x, y) == gTiles[EMPTY]){
+	}else if(gLevels[gLevel].tile(x, y) == gTiles[EMPTY]){
 		return false;
 	}
 	
