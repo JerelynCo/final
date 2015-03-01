@@ -1,5 +1,5 @@
 #--Source code--
-OBJ = Final.cpp
+OBJ = final.cpp
 
 #--Compiler used--
 CC = g++
