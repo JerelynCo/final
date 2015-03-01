@@ -1,3 +1,5 @@
+//Using SDL, SDL_image, SDL_ttf, standard IO, vectors, and strings
+
 /*
 Compiled via command line using:
 	g++ ballHell.cpp -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -o final
@@ -17,8 +19,24 @@ Compiled via command line using:
 #define PI 3.14159265
 
 //Screen dimension constants
+<<<<<<< HEAD:final.cpp
 const int SCREEN_WIDTH = 1200;
 const int SCREEN_LENGTH = 600;
+=======
+const int SCREEN_WIDTH = 1225;
+const int SCREEN_HEIGHT = 625;
+const int SCOREBOARD_HEIGHT = 50;
+const int PLAYFIELD_HEIGHT = SCREEN_WIDTH-SCOREBOARD_HEIGHT;
+
+using namespace std;
+
+//circle struct
+struct Circle{
+    int x, y;
+    int r;
+};
+
+>>>>>>> origin/Je:FinalM.cpp
 
 enum Terrain{
 	GRASS, BRICK, WATER, EMPTY 
@@ -107,7 +125,19 @@ class LTimer{
 };
 
 struct Tile{
+<<<<<<< HEAD:final.cpp
 	static const int LENGTH = 30, WIDTH = 30;
+=======
+		static const int HEIGHT = 25, WIDTH = 25;
+		static const int ROWS = SCREEN_HEIGHT/HEIGHT, COLS = SCREEN_WIDTH/WIDTH;
+
+		SDL_Rect t;
+		const Uint8 m, v;
+		
+		Tile(SDL_Rect tile, Uint8 mobility, Uint8 vulnerability):
+			t(tile), m(mobility), v(vulnerability) {};
+};
+>>>>>>> origin/Je:FinalM.cpp
 
 	SDL_Rect t;
 	const Uint8 m;
@@ -116,6 +146,7 @@ struct Tile{
 		t(tile), m(mobility) {};
 };
 
+<<<<<<< HEAD:final.cpp
 struct Map{
 	static const int ROWS = 25, COLS = 25;
 	
@@ -133,11 +164,31 @@ struct Map{
 struct Player{
 	static const int WIDTH = 20, LENGTH = 20;
 	static const int VEL = 2;
+=======
+//Player class
+class Player{
+	public:
+		//The dimensions of the player
+		static const int PLAYER_WIDTH = 20, PLAYER_HEIGHT = 20;
+		
+		//Maximum axis velocity of the player
+		static const int PLAYER_VEL = 2;
+
+		//Initializes the variables
+		Player(int);
+
+		//Takes key presses and adjusts the player's velocity
+		void handleEvent(SDL_Event& e);
+
+		//Moves the player
+		void move(Map*);
+>>>>>>> origin/Je:FinalM.cpp
 
 	Player(LTexture* texture, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot):
 		p{(Tile::WIDTH-WIDTH)/2, (Tile::LENGTH-LENGTH)/2, texture->getWidth(), texture->getHeight()},
 		dir(SOUTH), tex(texture), con{up, left, down, right, shoot} {};
 
+<<<<<<< HEAD:final.cpp
 	void act(const Uint8*);
 	void act(SDL_Scancode);
 	void move(int, int);
@@ -162,6 +213,55 @@ struct Bullet{
 		
 	bool move();
 	void render();
+=======
+		void activatePowerUp(int id);
+
+		Circle& getCollider();
+
+        void shiftColliders();
+
+        int getNLife();
+
+    private:
+		//The X and Y offsets of the player
+		int mPosX, mPosY;
+
+		//The velocity of the player
+		int mVelX, mVelY;
+
+		//Player ID
+		int mPlayerID;
+
+		//Player life
+		int mLife;
+
+		//the collider for the circle
+        Circle mCollider;
+
+};
+
+class PowerUp{
+	public:
+		//The dimensions of the power ups
+		static const int POWERUP_WIDTH = 20;
+		static const int POWERUP_HEIGHT = 20;
+
+		//Initializes the variables
+		PowerUp(int id);
+
+		//Shows the powerups on the screen
+		void render();
+
+		Circle& getCollider();
+		int getPowerUpID();
+
+		void clear();
+
+	private:
+		int mPosX, mPosY;
+		int mPowerUpID;
+		Circle mCollider;
+>>>>>>> origin/Je:FinalM.cpp
 };
 
 //Starts up SDL and creates window
@@ -172,6 +272,9 @@ bool loadMedia();
 
 //Frees media and shuts down SDL
 void close();
+
+//Checks collision between c1 and c2
+bool checkCollision(Circle& c1, Circle& c2);
 
 //The window renderer
 SDL_Renderer* gRenderer = NULL;
@@ -189,26 +292,47 @@ LTexture gPlayerTwoTexture;
 LTexture gBombTexture;
 LTexture gShieldTexture;
 LTexture gLifeTexture;
+LTexture gBulletUpgradeTexture;
 
 LTexture gTimeTextTexture;
 LTexture gPauseTextTexture;
+LTexture gLifeAvailableTexture;
 
+LTexture gTerrainSheet;
+
+///Vectors for the objects
+vector<Player> gPlayers;
+vector<PowerUp> gPowerUps;
+
+<<<<<<< HEAD:final.cpp
 std::vector<Map> gLevels;
 int gLevel = 0;
 
 std::vector<Player> gPlayers;
 std::vector<Bullet> gBullets;
+=======
+>>>>>>> origin/Je:FinalM.cpp
 
 LTimer gTimer;
+LTimer gPowerUpsTimer;
 
+<<<<<<< HEAD:final.cpp
 LTexture gSpriteSheet;
 Tile* gTiles[4];
+=======
+//Tile array
+Tile* tile[4];
+>>>>>>> origin/Je:FinalM.cpp
+
+//Power up variables
+const int LIFEID = 0, BOMBID = 1, SHIELDID = 2, BULLETUPGRADEID = 3;
+int nLife = 3, nBomb = 0, nShield = 0, nBulletUpgrade = 0;
+int powerUpsDuration = 3;
 
 int main(int argc, char *args[]){	
 	gTimer.start();
-	if(gTimer.isStarted()){
-		printf("Start");
-	}
+	int set = 1;
+
 	//Start up SDL and create window
 	if(!init()){
 		printf("Failed to initialize!\n");
@@ -219,10 +343,28 @@ int main(int argc, char *args[]){
 		}else{
 			//Main loop flag
 			bool quit = false;
+			//Create and push powerups in vector gPowerUps
+			int powerUpsArr[5][4] = {{LIFEID, BOMBID, SHIELDID, BULLETUPGRADEID}, {3, 0, 0, 0}, {0, 2, 0, 0}, {0, 0, 0, 2}, {0, 0, 2, 0}};
 			
+<<<<<<< HEAD:final.cpp
 			//Create players
 			gPlayers.emplace_back(&gPlayerOneTexture, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C);
 			gPlayers.emplace_back(&gPlayerTwoTexture, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N);
+=======
+
+			for(int i = 0; i < 4; i++){
+				for(int j = 0; j < powerUpsArr[set][i]; j++){
+					PowerUp powerup(powerUpsArr[0][i]);
+					gPowerUps.push_back(powerup);
+				}
+			}
+
+			//Create and push players to vector
+			Player playerOne(0);
+			gPlayers.push_back(playerOne);
+			Player playerTwo(1);
+			gPlayers.push_back(playerTwo);
+>>>>>>> origin/Je:FinalM.cpp
 			
 			//Event handler
 			SDL_Event event;
@@ -241,7 +383,12 @@ int main(int argc, char *args[]){
 			
 			//start global game timer
 			gTimer.start();
+
 			
+<<<<<<< HEAD:final.cpp
+=======
+			Map map;
+>>>>>>> origin/Je:FinalM.cpp
 			//While application is running
 			while(!quit){									
 				while(SDL_PollEvent(&event)){
@@ -269,17 +416,37 @@ int main(int argc, char *args[]){
 				for(int i = 0; i < gPlayers.size(); ++i){
 					gPlayers[i].act(state);
 				}
-				
+
 				if(gTimer.isStarted() && !gTimer.isPaused()){
+					//Setting up Viewports' dimensions
+					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
+					SDL_Rect playfield = {0, SCOREBOARD_HEIGHT, SCREEN_WIDTH, PLAYFIELD_HEIGHT};
+
+					//Clear screen
+					SDL_RenderClear(gRenderer);
+
+					//Set scoreboard and timer viewport
+					SDL_RenderSetViewport(gRenderer, &scoreboard);
+
+					SDL_SetRenderDrawColor(gRenderer, 0x3F, 0xB4, 0xB4, 0xFF);
+					SDL_RenderFillRect(gRenderer, &scoreboard);
+					
 					//Set text to be rendered
 					timeText.str( "" );
+<<<<<<< HEAD:final.cpp
 					timeText << "Time: " << (gTimer.getTicks()/1000);
 
+=======
+					timeText << "Time: " << (gTimer.getTicks() / 1000);
+					
+>>>>>>> origin/Je:FinalM.cpp
 					//Render text
 					if(!gTimeTextTexture.loadFromRenderedText(timeText.str().c_str(), textColor)){
 						printf("Unable to render time texture!\n");
 					}
+					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth())/2, (SCOREBOARD_HEIGHT-gTimeTextTexture.getHeight())/2);
 
+<<<<<<< HEAD:final.cpp
 					//Clear screen
 					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 					SDL_RenderClear(gRenderer);
@@ -299,17 +466,57 @@ int main(int argc, char *args[]){
 						}
 					}
 					
+=======
+					for(int i = 0; i < gPlayers.size(); i++){
+						for(int j = 0; j < gPlayers[i].getNLife(); j++){
+							if(i==0)
+								gLifeAvailableTexture.render(gLifeAvailableTexture.getWidth() * j,(SCOREBOARD_HEIGHT-gLifeAvailableTexture.getHeight())/2);
+							else if(i==1)
+								gLifeAvailableTexture.render(SCREEN_WIDTH-gLifeAvailableTexture.getWidth() * (j+1),(SCOREBOARD_HEIGHT-gLifeAvailableTexture.getHeight())/2);
+						}
+					}
+					//Set playfield viewport
+					SDL_RenderSetViewport(gRenderer, &playfield);
+					SDL_SetRenderDrawColor(gRenderer, 0xB4, 0xB4, 0xB4, 0xFF);
+					
+					map.render();
+
+	
+					for(int i = 0; i < gPowerUps.size(); i++){
+						gPowerUps[i].render();
+						if(!gPowerUpsTimer.isStarted()){
+							gPowerUpsTimer.start();
+						}
+					}
+					if(gPowerUpsTimer.getTicks()/1000 > powerUpsDuration){
+						gPowerUps.clear();
+						gPowerUpsTimer.stop();
+						set++;
+					}
+					
+
+>>>>>>> origin/Je:FinalM.cpp
 					for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].render();
+						for(int j = 0; j < gPowerUps.size(); j++){
+							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
+						    	gPowerUps.erase(gPowerUps.begin()+j);
+						    	gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID());
+						    }
+						}
 					}
 				}
 
 				else{
 					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 					SDL_RenderClear(gRenderer);
+<<<<<<< HEAD:final.cpp
 					gPauseTextTexture.render(new SDL_Rect{(SCREEN_WIDTH-gPauseTextTexture.getWidth())/2,
 						(SCREEN_LENGTH-gPauseTextTexture.getHeight())/2, 0, 0});
 
+=======
+					gPauseTextTexture.render((SCREEN_WIDTH-gPauseTextTexture.getWidth())/2, (SCREEN_HEIGHT-gPauseTextTexture.getHeight())/2);
+>>>>>>> origin/Je:FinalM.cpp
 				}
 				
 				//Update screen
@@ -320,7 +527,6 @@ int main(int argc, char *args[]){
 	
 	//Free resources and close SDL
 	close();
-	
 	return 0;
 }
 
@@ -391,7 +597,6 @@ bool LTexture::loadFromRenderedText(std::string textureText, SDL_Color textColor
 			mWidth = textSurface->w;
 			mHeight = textSurface->h;
 		}
-		
 		//Get rid of old surface
 		SDL_FreeSurface(textSurface);
 	}
@@ -400,7 +605,6 @@ bool LTexture::loadFromRenderedText(std::string textureText, SDL_Color textColor
 	return mTexture != NULL;
 }
 #endif
-
 void LTexture::free(){
 	//Free texture if it exists
 	if(mTexture != NULL){
@@ -432,7 +636,6 @@ void LTexture::render(SDL_Rect* dst, SDL_Rect* src, double angle, SDL_Point* cen
 		dst->w = mWidth;
 		dst->h = mHeight;
 	}
-	
 	//Render to screen
 	SDL_RenderCopyEx(gRenderer, mTexture, src, dst, angle, center, flip);
 }	
@@ -556,6 +759,7 @@ Map::Map(){
 	t = {0, 0, Tile::WIDTH, Tile::LENGTH};
 }
 
+<<<<<<< HEAD:final.cpp
 Tile* Map::tile(int x, int y){
 	if(x >= 0 && x < Tile::WIDTH*Map::COLS
 		&& y >= 0 && y < Tile::LENGTH*Map::ROWS){
@@ -577,10 +781,21 @@ void Map::render(){
 			t.x = j*Tile::WIDTH;
 			t.y = i*Tile::LENGTH;
 			gSpriteSheet.render(&t, &(map[j][i]->t));
+=======
+Tile* Map::getTile(int x, int y){
+	return tile[tileMap[x/Tile::WIDTH][y/Tile::HEIGHT]];
+}
+
+void Map::render(){
+	for(int i = 0; i < Tile::ROWS; ++i){
+		for(int j = 0; j < Tile::COLS; ++j){
+			gTerrainSheet.render(j*Tile::WIDTH, i*Tile::HEIGHT, &(tile[tileMap[j][i]]->t));
+>>>>>>> origin/Je:FinalM.cpp
 		}
 	}
 }
 
+<<<<<<< HEAD:final.cpp
 void Player::act(const Uint8* state){
 	if(state[con[UP]]){move(0, -VEL); dir = NORTH;}
 	if(state[con[LEFT]]){move(-VEL, 0); dir = WEST;}
@@ -590,11 +805,83 @@ void Player::act(const Uint8* state){
 
 void Player::act(SDL_Scancode key){
 	if(key == con[SHOOT]){shoot();}
+=======
+Player::Player(int id)
+{
+	//assigning player ID
+	mPlayerID = id;
+
+    //Initialize the positions
+    if(mPlayerID == 0){
+    	mPosX = 0;
+    	mPosY = 0;
+    }
+    else if(mPlayerID == 1){
+    	mPosX = SCREEN_WIDTH-PLAYER_WIDTH;
+    	mPosY = (SCREEN_HEIGHT-PLAYER_HEIGHT)/2;
+    }   
+
+    //Initialize the velocity
+    mVelX = 0;
+    mVelY = 0;
+
+    //for the colliders
+    mCollider.x = mPosX;
+    mCollider.y = mPosY;
+    mCollider.r = PLAYER_WIDTH/2;
+
+    //default number of lives
+    mLife = 3;
+}
+
+void Player::handleEvent(SDL_Event& e){
+	//Controls: WASD and Arrow keys
+	if(e.type == SDL_KEYDOWN && e.key.repeat == 0){
+    	if(mPlayerID == 0){
+	        switch( e.key.keysym.sym ){
+	        	case SDLK_w: mVelY -= PLAYER_VEL; break;
+	            case SDLK_s: mVelY += PLAYER_VEL; break;
+	            case SDLK_a: mVelX -= PLAYER_VEL; break;
+	            case SDLK_d: mVelX += PLAYER_VEL; break;
+	        }
+    	}
+    	if(mPlayerID == 1){
+	        switch( e.key.keysym.sym ){
+	            case SDLK_UP: mVelY -= PLAYER_VEL; break;
+	            case SDLK_DOWN: mVelY += PLAYER_VEL; break;
+	            case SDLK_LEFT: mVelX -= PLAYER_VEL; break;
+	            case SDLK_RIGHT: mVelX += PLAYER_VEL; break;
+	        }
+    	}
+    }
+    //If a key was released
+    else if(e.type == SDL_KEYUP && e.key.repeat == 0){
+        if(mPlayerID == 0){
+        	//Adjust the velocity
+	        switch( e.key.keysym.sym ){
+	        	case SDLK_w: mVelY += PLAYER_VEL; break;
+	            case SDLK_s: mVelY -= PLAYER_VEL; break;
+	            case SDLK_a: mVelX += PLAYER_VEL; break;
+	            case SDLK_d: mVelX -= PLAYER_VEL; break;   
+	        }
+    	}
+    	if(mPlayerID == 1){
+        	//Adjust the velocity
+	        switch( e.key.keysym.sym ){
+	            case SDLK_UP: mVelY += PLAYER_VEL; break;
+	            case SDLK_DOWN: mVelY -= PLAYER_VEL; break;
+	            case SDLK_LEFT: mVelX += PLAYER_VEL; break;
+	            case SDLK_RIGHT: mVelX -= PLAYER_VEL; break;
+	        }
+    	}
+    }
+>>>>>>> origin/Je:FinalM.cpp
 }
 
 void Player::move(int vx, int vy){
     p.x += vx;
 	
+<<<<<<< HEAD:final.cpp
     if((gLevels[gLevel].tile(p.x, p.y))->m > 0
 		|| (gLevels[gLevel].tile(p.x+WIDTH, p.y))->m > 0
 		|| (gLevels[gLevel].tile(p.x, p.y+LENGTH))->m > 0
@@ -609,6 +896,28 @@ void Player::move(int vx, int vy){
 		|| (gLevels[gLevel].tile(p.x, p.y+LENGTH))->m > 0
 		|| (gLevels[gLevel].tile(p.x+WIDTH, p.y+LENGTH))->m > 0){
         p.y -= vy;
+=======
+    //If the Player went too far to the left or right
+    if((mPosX < 0) || (mPosX + PLAYER_WIDTH > SCREEN_WIDTH) || (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider()))
+		|| ((map->getTile(mPosX, mPosY))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m > 0)
+		|| ((map->getTile(mPosX, mPosY+PLAYER_HEIGHT))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_HEIGHT))->m > 0)){
+        //Move back
+        mPosX -= mVelX;
+        shiftColliders();
+    }
+
+    //Move the Player up or down
+    mPosY += mVelY;
+    shiftColliders();
+    //If the Player went too far up or down
+
+    if((mPosY < 0)||(mPosY + PLAYER_HEIGHT > SCREEN_HEIGHT-SCOREBOARD_HEIGHT)|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider()))
+		|| ((map->getTile(mPosX, mPosY))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY))->m > 0)
+		|| ((map->getTile(mPosX, mPosY+PLAYER_HEIGHT))->m > 0 || (map->getTile(mPosX+PLAYER_WIDTH, mPosY+PLAYER_HEIGHT))->m > 0)){
+        //Move back
+        mPosY -= mVelY;
+        shiftColliders();
+>>>>>>> origin/Je:FinalM.cpp
     }
 }
 
@@ -620,6 +929,7 @@ void Player::render(){
     tex->render(&p, NULL, 90*dir);
 }
 
+<<<<<<< HEAD:final.cpp
 bool Bullet::move(){
 	x += VEL*cos(PI*(dir+1)/2);
 	y += VEL*sin(PI*(dir+1)/2);
@@ -632,6 +942,19 @@ bool Bullet::move(){
 		return false;
 	}else if(gLevels[gLevel].tile(x, y) == gTiles[EMPTY]){
 		return false;
+=======
+int Player::getNLife(){
+	return mLife;
+}
+
+void Player::render(){
+    //Show the Player
+    if(mPlayerID == 0){
+    	gPlayerOneTexture.render(mPosX, mPosY);
+    }
+	if(mPlayerID == 1){
+		gPlayerTwoTexture.render(mPosX, mPosY);
+>>>>>>> origin/Je:FinalM.cpp
 	}
 	
 	return true;
@@ -640,6 +963,83 @@ bool Bullet::move(){
 void Bullet::render(){
 	SDL_Rect bullet = {(int) x, (int) y, WIDTH, LENGTH};
 	SDL_RenderFillRect(gRenderer, &bullet);
+}
+
+void Player::activatePowerUp(int id){
+	switch(id){
+		case LIFEID:
+			printf("life\n");
+			mLife++;
+			break;
+		case BOMBID:
+			printf("bomb\n");
+			break;
+		case SHIELDID:
+			printf("shield\n");
+			break;
+		case BULLETUPGRADEID:
+			printf("bullet upgraded\n");
+			break;
+	}
+}
+
+
+PowerUp::PowerUp(int id){
+	//assigning powerup ID
+	mPowerUpID = id;
+
+    //Initialize the positions
+    switch(mPowerUpID){
+    	case 0:
+    		mPosX = rand()%SCREEN_WIDTH - POWERUP_WIDTH;
+    		mPosY = rand()%(SCREEN_HEIGHT) - (POWERUP_HEIGHT+SCOREBOARD_HEIGHT);
+    		break;
+    	case 1:
+    		mPosX = rand()%SCREEN_WIDTH - POWERUP_WIDTH;
+    		mPosY = rand()%(SCREEN_HEIGHT) - (POWERUP_HEIGHT+SCOREBOARD_HEIGHT);
+    		break;
+    	case 2:
+    		mPosX = rand()%SCREEN_WIDTH - POWERUP_WIDTH;
+    		mPosY = rand()%(SCREEN_HEIGHT) - (POWERUP_HEIGHT+SCOREBOARD_HEIGHT);
+    		break;
+    	case 3:
+    		mPosX = rand()%SCREEN_WIDTH - POWERUP_WIDTH;
+    		mPosY = rand()%(SCREEN_HEIGHT) - (POWERUP_HEIGHT+SCOREBOARD_HEIGHT);
+    		break;
+    }
+    //for the colliders
+    mCollider.x = mPosX;
+    mCollider.y = mPosY;
+    mCollider.r = POWERUP_WIDTH/2;
+}
+
+Circle& PowerUp::getCollider(){
+    return mCollider;
+}
+
+int PowerUp::getPowerUpID(){
+	return mPowerUpID;
+}
+
+void PowerUp::render(){
+    //Show the powerups
+	switch(mPowerUpID){
+    	case 0:
+    		gLifeTexture.render(mPosX, mPosY);
+    		break;
+    	case 1:
+    		gBombTexture.render(mPosX, mPosY);
+    		break;
+    	case 2:
+    		gShieldTexture.render(mPosX, mPosY);
+    		break;
+    	case 3:
+    		gBulletUpgradeTexture.render(mPosX, mPosY);
+    		break;
+    }
+}
+void PowerUp::clear(){
+	printf("CLEAR\n");
 }
 
 bool init(){
@@ -657,7 +1057,7 @@ bool init(){
 		}
 		
 		//Create window
-		gWindow = SDL_CreateWindow("Project", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_LENGTH, SDL_WINDOW_SHOWN);
+		gWindow = SDL_CreateWindow("Project", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 		if(gWindow == NULL){
 			printf("Window could not be created! SDL Error: %s\n", SDL_GetError());
 			success = false;
@@ -741,6 +1141,16 @@ bool loadMedia(){
 		printf("Failed to load life texture!\n");
 		success = false;
 	}
+	if(!gBulletUpgradeTexture.loadFromFile("Assets/bulletUp.png")){
+		printf("Failed to load life texture!\n");
+		success = false;
+	}
+
+	//Load players' life available image
+	if(!gLifeAvailableTexture.loadFromFile("Assets/lifeAvailable.png")){
+		printf("Failed to load life texture!\n");
+		success = false;
+	}
 	
 	return success;
 }
@@ -749,11 +1159,21 @@ void close(){
 	//Free loaded images
 	gPauseTextTexture.free();
 	gTimeTextTexture.free();
+<<<<<<< HEAD:final.cpp
 	
 	gBombTexture.free();
 	gShieldTexture.free();
 	gLifeTexture.free();
 	
+=======
+
+	gBombTexture.free();
+	gLifeTexture.free();
+	gShieldTexture.free();
+	gBulletUpgradeTexture.free();
+
+	gLifeAvailableTexture.free();
+>>>>>>> origin/Je:FinalM.cpp
 	gPlayerOneTexture.free();
 	gPlayerTwoTexture.free();
 	
