@@ -163,6 +163,8 @@ class Player{
 
         void shiftColliders();
 
+        void renderLifeTexture();
+
         int getNLife();
 
     private:
@@ -188,6 +190,8 @@ class PowerUp{
 		//The dimensions of the power ups
 		static const int POWERUP_WIDTH = 20;
 		static const int POWERUP_HEIGHT = 20;
+		static const int POWERUPSDURATION = 3; //in seconds
+		static const int LIFEID = 0, BOMBID = 1, SHIELDID = 2, BULLETUPGRADEID = 3;
 
 		//Initializes the variables
 		PowerUp(int id);
@@ -197,7 +201,6 @@ class PowerUp{
 
 		Circle& getCollider();
 		int getPowerUpID();
-
 		void clear();
 
 	private:
@@ -254,14 +257,10 @@ LTimer gPowerUpsTimer;
 //Tile array
 Tile* tile[4];
 
-//Power up variables
-const int LIFEID = 0, BOMBID = 1, SHIELDID = 2, BULLETUPGRADEID = 3;
-int nLife = 3, nBomb = 0, nShield = 0, nBulletUpgrade = 0;
-int powerUpsDuration = 3;
 
 int main(int argc, char *args[]){	
 	gTimer.start();
-	int set = 1;
+	
 
 	//Start up SDL and create window
 	if(!init()){
@@ -273,28 +272,28 @@ int main(int argc, char *args[]){
 		}else{
 			//Main loop flag
 			bool quit = false;
-			//Create and push powerups in vector gPowerUps
-			int powerUpsArr[5][4] = {{LIFEID, BOMBID, SHIELDID, BULLETUPGRADEID}, {3, 0, 0, 0}, {0, 2, 0, 0}, {0, 0, 0, 2}, {0, 0, 2, 0}};
-			
 
-			for(int i = 0; i < 4; i++){
-				for(int j = 0; j < powerUpsArr[set][i]; j++){
-					PowerUp powerup(powerUpsArr[0][i]);
-					gPowerUps.push_back(powerup);
-				}
-			}
+			//Create and push powerups in vector gPowerUps in form of sets
+			static const int nPowerUpsSets = 4;
+			int powerUpsArr[nPowerUpsSets+1][4] = {{PowerUp::LIFEID, PowerUp::BOMBID, PowerUp::SHIELDID, PowerUp::BULLETUPGRADEID}, {0, 0, 0, 2}, {0, 2, 0, 0}, {3, 0, 1, 0}, {0, 0, 2, 0}};	
+
+			//tells when to switch upgrade set
+			bool switchUpgrades = true;
+			//times to display the set
+			int powerUpsTime[nPowerUpsSets] = {2, 9, 20, 30};
+			//int setCounter = 0;
+			int set = 1;
 
 			//Create and push players to vector
-			Player playerOne(0);
-			gPlayers.push_back(playerOne);
-			Player playerTwo(1);
-			gPlayers.push_back(playerTwo);
+		
+			gPlayers.emplace_back(0);
+			gPlayers.emplace_back(1);
 			
 			//Event handler
 			SDL_Event e;
 
 			//Set text color as black
-			SDL_Color textColor = { 0, 0, 0, 255 };
+			SDL_Color textColor = {0, 0, 0, 255};
 
 			//In memory text stream
 			std::stringstream timeText;
@@ -328,6 +327,15 @@ int main(int argc, char *args[]){
 						gPlayers[i].handleEvent(e);
 					}
 				}
+				if(switchUpgrades && set <= nPowerUpsSets){
+					for(int i = 0; i < 4; i++){
+						for(int j = 0; j < powerUpsArr[set][i]; j++){
+							PowerUp powerup(powerUpsArr[0][i]);
+							gPowerUps.push_back(powerup);
+						}
+					}
+					switchUpgrades = false;
+				}
 
 				if(gTimer.isStarted() && !gTimer.isPaused()){
 					//Setting up Viewports' dimensions
@@ -352,39 +360,39 @@ int main(int argc, char *args[]){
 						printf("Unable to render time texture!\n");
 					}
 					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth())/2, (SCOREBOARD_HEIGHT-gTimeTextTexture.getHeight())/2);
-
+					
+					//Render players' lives
 					for(int i = 0; i < gPlayers.size(); i++){
-						for(int j = 0; j < gPlayers[i].getNLife(); j++){
-							if(i==0)
-								gLifeAvailableTexture.render(gLifeAvailableTexture.getWidth() * j,(SCOREBOARD_HEIGHT-gLifeAvailableTexture.getHeight())/2);
-							else if(i==1)
-								gLifeAvailableTexture.render(SCREEN_WIDTH-gLifeAvailableTexture.getWidth() * (j+1),(SCOREBOARD_HEIGHT-gLifeAvailableTexture.getHeight())/2);
-						}
+						gPlayers[i].renderLifeTexture();
 					}
+					
 					//Set playfield viewport
 					SDL_RenderSetViewport(gRenderer, &playfield);
 					SDL_SetRenderDrawColor(gRenderer, 0xB4, 0xB4, 0xB4, 0xFF);
 					
 					//map.render();
 
-	
-					for(int i = 0; i < gPowerUps.size(); i++){
-						gPowerUps[i].render();
-						if(!gPowerUpsTimer.isStarted()){
-							gPowerUpsTimer.start();
+					if(gTimer.getTicks()/1000 > powerUpsTime[set-1] && set <= nPowerUpsSets){
+						for(int i = 0; i < gPowerUps.size(); i++){
+							gPowerUps[i].render();
+							if(!gPowerUpsTimer.isStarted()){
+								gPowerUpsTimer.start();
+							}
+							if(gPowerUpsTimer.getTicks()/1000 > PowerUp::POWERUPSDURATION){
+								gPowerUps.clear();
+								gPowerUpsTimer.stop();
+								switchUpgrades = true;
+								set++;
+								printf("success\n");
+							}
 						}
 					}
-					if(gPowerUpsTimer.getTicks()/1000 > powerUpsDuration){
-						gPowerUps.clear();
-						gPowerUpsTimer.stop();
-						set++;
-					}
 					
-
+					
 					for(int i = 0; i < gPlayers.size(); i++){
 						/*gPlayers[i].move(&map);*/
 						gPlayers[i].move();
-						gPlayers[i].render();
+						gPlayers[i].render();		
 						for(int j = 0; j < gPowerUps.size(); j++){
 							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
 						    	gPowerUps.erase(gPowerUps.begin()+j);
@@ -797,22 +805,30 @@ void Player::render(){
 	if(mPlayerID == 1){
 		gPlayerTwoTexture.render(mPosX, mPosY);
 	}
+}
 
+void Player::renderLifeTexture(){
+	for(int j = 0; j < mLife; j++){	
+		if(mPlayerID==0)
+			gLifeAvailableTexture.render(gLifeAvailableTexture.getWidth() * j,(SCOREBOARD_HEIGHT-gLifeAvailableTexture.getHeight())/2);
+		else if(mPlayerID==1)
+			gLifeAvailableTexture.render(SCREEN_WIDTH-gLifeAvailableTexture.getWidth() * (j+1),(SCOREBOARD_HEIGHT-gLifeAvailableTexture.getHeight())/2);
+	}
 }
 
 void Player::activatePowerUp(int id){
 	switch(id){
-		case LIFEID:
+		case PowerUp::LIFEID:
 			printf("life\n");
 			mLife++;
 			break;
-		case BOMBID:
+		case PowerUp::BOMBID:
 			printf("bomb\n");
 			break;
-		case SHIELDID:
+		case PowerUp::SHIELDID:
 			printf("shield\n");
 			break;
-		case BULLETUPGRADEID:
+		case PowerUp::BULLETUPGRADEID:
 			printf("bullet upgraded\n");
 			break;
 	}
@@ -872,9 +888,6 @@ void PowerUp::render(){
     		gBulletUpgradeTexture.render(mPosX, mPosY);
     		break;
     }
-}
-void PowerUp::clear(){
-	printf("CLEAR\n");
 }
 
 bool init(){
