@@ -137,8 +137,9 @@ struct Map{
 	void hit(int, int);
 	void render();
 	
+	Tile* map[COLS][ROWS];
+
 	private:
-		Tile* map[COLS][ROWS];
 		SDL_Rect t;
 };
 
@@ -147,7 +148,7 @@ struct Player{
 	static const int VEL = 2;
 	int life = 3;
 
-	Player(LTexture* texture, int x, int y, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, int lifeAvailableYPos):
+	Player(LTexture* texture, int lifeAvailableYPos, int x, int y, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot):
 		playerRect{x, y, texture->getWidth(), texture->getLength()},
 		dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2}, lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot} {};
 
@@ -175,13 +176,11 @@ struct Player{
 struct PowerUp{
 	static const int WIDTH = 20, LENGTH = 20;
 
-	PowerUp(LTexture* texture, int id):
-		powerUpRect{rand()%(SCREEN_WIDTH - WIDTH), rand()%(SCREEN_LENGTH-SCOREBOARD_LENGTH) - LENGTH, texture->getWidth(), texture->getLength()},
-		powerUpTex(texture), id(id){};
+	PowerUp(LTexture* texture, int pwrUp_id);
 
-		void render();
-		Circle& getCollider();
-		int getPowerUpID();
+	void render();
+	Circle& getCollider();
+	int getPowerUpID();
 
 	private:
 		int id;
@@ -249,8 +248,13 @@ std::vector<Player> gPlayers;
 std::vector<Bullet> gBullets;
 std::vector<PowerUp> gPowerUps;
 
+std::random_device type;
+
+std::vector<int> x;
+std::vector<int> y;
+
 LTimer gTimer;
-LTimer gDisplayPowerUpsTimer;
+LTimer gDsplyPwrUpsTimer;
 
 LTexture gSpriteSheet;
 Tile* gTiles[4];
@@ -272,19 +276,21 @@ int main(int argc, char *args[]){
 			bool quit = false;
 			
 			//Create players
-			gPlayers.emplace_back(&gPlayerOneTexture, 5, 5, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, 15);
-			gPlayers.emplace_back(&gPlayerTwoTexture, SCREEN_WIDTH-Player::WIDTH-5, PLAYFIELD_LENGTH-Player::LENGTH-5, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, 37);
+			gPlayers.emplace_back(&gPlayerOneTexture, 15, 5, 5, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C);
+			gPlayers.emplace_back(&gPlayerTwoTexture, 37, SCREEN_WIDTH-Player::WIDTH-5, PLAYFIELD_LENGTH-Player::LENGTH-5, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N);
 			
 			//Power ups variables
 			static const int NSETS = 4;
 			static const int NPOWERUPS = 4;
-			static const int POWERUPSDURATION = 3;
-			int powerUpsArr[NSETS+1][NPOWERUPS] = {{LIFE, BOMB, SHIELD, BULLETUPGRADE}, {0, 0, 3, 2}, {0, 2, 0, 0}, {3, 0, 1, 0}, {0, 0, 2, 0}};	
-			bool switchUpgrades = true;
-			int powerUpsTime[NSETS] = {2, 7, 12, 16};
-			int set = 1;
+			static const int DSPLYTIMEPWRUP = 8;
+
+			static const int powerUpsSet[NSETS][NPOWERUPS] = {{0, 0, 3, 2}, {0, 2, 0, 0}, {3, 0, 1, 0}, {0, 0, 2, 0}};	
 			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombTexture, gShieldTexture, gBulletUpgradeTexture};
 
+			int set = 0;	
+			bool nextSet = true;
+			int powerUpsTime[NSETS] = {2, 20, 40, 70};
+					
 			//Event handler
 			SDL_Event event;
 			const Uint8* state = SDL_GetKeyboardState(NULL);
@@ -331,16 +337,17 @@ int main(int argc, char *args[]){
 					gPlayers[i].act(state);
 				}
 
-				if(switchUpgrades && set <= NSETS){
+				if(nextSet && set < NSETS){
 					for(int i = 0; i < NPOWERUPS; i++){
-						for(int j = 0; j < powerUpsArr[set][i]; j++){
+						for(int j = 0; j < powerUpsSet[set][i]; j++){
 							gPowerUps.emplace_back(&powerUpsTex[i], i);
 						}
 					}
-					switchUpgrades = false;
+					nextSet = false;
 				}
 				
 				if(gTimer.isStarted() && !gTimer.isPaused()){
+
 					//Viewports
 					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_LENGTH};
 					SDL_Rect playfield = {0, SCOREBOARD_LENGTH, SCREEN_WIDTH, PLAYFIELD_LENGTH};
@@ -372,16 +379,16 @@ int main(int argc, char *args[]){
 					
 					gLevels[gLevel].render();
 					
-					if(gTimer.getTicks()/1000 > powerUpsTime[set-1] && set <= NSETS){
+					if(gTimer.getTicks()/1000 > powerUpsTime[set] && set < NSETS){
 						for(int i = 0; i < gPowerUps.size(); i++){
 							gPowerUps[i].render();
-							if(!gDisplayPowerUpsTimer.isStarted()){
-								gDisplayPowerUpsTimer.start();
+							if(!gDsplyPwrUpsTimer.isStarted()){
+								gDsplyPwrUpsTimer.start();
 							}
-							if(gDisplayPowerUpsTimer.getTicks()/1000 > POWERUPSDURATION){
+							if(gDsplyPwrUpsTimer.getTicks()/1000 > DSPLYTIMEPWRUP){
 								gPowerUps.clear();
-								gDisplayPowerUpsTimer.stop();
-								switchUpgrades = true;
+								gDsplyPwrUpsTimer.stop();
+								nextSet = true;
 								set++;
 								printf("success\n");
 							}
@@ -400,8 +407,8 @@ int main(int argc, char *args[]){
 						gPlayers[i].render();
 						for(int j = 0; j < gPowerUps.size(); j++){
 							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
-						    	gPowerUps.erase(gPowerUps.begin()+j);
 						    	gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID());
+						    	gPowerUps.erase(gPowerUps.begin()+j);	
 						    }
 						}
 					}
@@ -640,7 +647,6 @@ bool LTimer::isPaused(){
 }
 
 Map::Map(){
-	std::random_device type;
 	for(int i = 0; i < ROWS; ++i){
 		for(int j = 0; j < COLS; ++j){
 			if(i%2 == 0 || j%2 == 0){
@@ -737,6 +743,26 @@ void Player::shoot(){
 
 void Player::render(){
     playerTex->render(&playerRect, NULL, 90*dir);
+}
+
+PowerUp::PowerUp(LTexture* texture, int pwrUp_id){
+	//Gets grass tiles positions for power up positioning
+	for(int i = 0; i < SCREEN_WIDTH; i+=Tile::WIDTH){
+		for(int j = 0; j < PLAYFIELD_LENGTH; j+=Tile::LENGTH){
+			if(gLevels[gLevel].tile(i,j) == gTiles[GRASS]){
+				x.push_back(i);
+				y.push_back(j);
+			}
+		}
+	}
+	//gets a random position to place the powerup
+	int randInd = type()%x.size();
+	powerUpRect = {x[randInd]+Tile::WIDTH/5, y[randInd]+Tile::LENGTH/5, texture->getWidth(), texture->getLength()};
+	powerUpTex = texture;
+	id = pwrUp_id;
+	collider = {x[randInd]+Tile::WIDTH/5, y[randInd]+Tile::LENGTH/5, WIDTH/2};
+	
+
 }
 
 void PowerUp::render(){
