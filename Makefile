@@ -1,5 +1,5 @@
 #--Source code--
-OBJ = Final.cpp
+OBJ = final.cpp
 
 #--Compiler used--
 CC = g++
@@ -12,4 +12,4 @@ OBJ_NAME = Final
 
 #--This is the target that compiles our executable--
 all : $(OBJS)  
-	$(CC) $(C++11) $(OBJ) $(LIBRARY_LINKS) -o $(OBJ_NAME)
+	$(CC) $(OBJ) $(LIBRARY_LINKS) -o $(OBJ_NAME)
