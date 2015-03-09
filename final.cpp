@@ -173,18 +173,19 @@ class Player{
 	void shiftColliders();
 	void render();
 	void renderLifeTexture();
-	void activatePowerUp(int id);
+	void activatePowerUp(int id, SDL_Rect& Rect);
 
 
 };
 
 class PowerUp{
-
-		int id;
+ 		int id;
 		Circle collider;
-		SDL_Rect powerUpRect;
+
 		LTexture* powerUpTex;
+		//Rect is changed to public
  public:
+    SDL_Rect powerUpRect;
 	static const int WIDTH = 20, LENGTH = 20;
 
 	PowerUp(LTexture* texture, int pwrUp_id);
@@ -205,10 +206,10 @@ class Bullet{
 		x(xStart), y(yStart), dir(direction){};
 		//bullet{(int) x, (int) y, WIDTH, LENGTH}{}
 
-	bool move();
+	bool move(Player p);
 	void render();
-	/*private:
-		SDL_Rect bullet;*/
+	private:
+		SDL_Rect bullet;
 };
 
 //Starts up SDL and creates window
@@ -220,6 +221,7 @@ bool loadMedia();
 //Checks collision between c1 and c2
 bool checkCollision(Circle& c1, Circle& c2);
 bool checkCollision(Circle& c1, SDL_Rect r);
+//bool checkCollision(Circle& c1, SDL_Point p);
 
 //Frees media and shuts down SDL
 void close();
@@ -289,7 +291,7 @@ int main(int argc, char *args[]){
 			static const int NSETS = 4;
 			static const int NPOWERUPS = 4;
 			static const int DSPLYTIMEPWRUP = 8;
-
+                                                              //LIFE, BOMB, SHIELD, BULLETUPGRADE
 			static const int powerUpsSet[NSETS][NPOWERUPS] = {{0, 0, 3, 2}, {0, 2, 0, 0}, {3, 0, 1, 0}, {0, 0, 2, 0}};
 			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombTexture, gShieldTexture, gBulletUpgradeTexture};
 
@@ -343,7 +345,7 @@ int main(int argc, char *args[]){
 					gPlayers[i].act(state);
 				}
 
-				if(nextSet && set < NSETS){
+				if(nextSet && set < NSETS){//what does this mean?
 					for(int i = 0; i < NPOWERUPS; i++){
 						for(int j = 0; j < powerUpsSet[set][i]; j++){
 							gPowerUps.emplace_back(&powerUpsTex[i], i);
@@ -402,10 +404,12 @@ int main(int argc, char *args[]){
 					}
 
 					for(int i = 0; i < gBullets.size(); ++i){
-						if(gBullets[i].move()){
-							gBullets[i].render();
-						}else{
-							gBullets.erase(gBullets.begin()+i);
+                        for(int j = 0; j<gPlayers.size(); j++){
+                            if(gBullets[i].move(gPlayers[j])){
+                                gBullets[i].render();
+                            }else{
+                                gBullets.erase(gBullets.begin()+i);
+                            }
 						}
 					}
 
@@ -413,7 +417,7 @@ int main(int argc, char *args[]){
 						gPlayers[i].render();
 						for(int j = 0; j < gPowerUps.size(); j++){
 							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
-						    	gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID());
+						    	gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID(),gPowerUps[j].powerUpRect);
 						    	gPowerUps.erase(gPowerUps.begin()+j);
 						    }
 						}
@@ -710,7 +714,7 @@ void Player::act(SDL_Scancode key){
 }
 
 void Player::move(int vx, int vy){
-    playerRect.x += vx;
+    playerRect.x += vx;//whatever the position of the rectangle is will also be the position where the rectangel will be rendered
     shiftColliders();
 
     if((gLevels[gLevel].tile(playerRect.x, playerRect.y))->m > 0
@@ -722,7 +726,7 @@ void Player::move(int vx, int vy){
         shiftColliders();
     }
 
-    playerRect.y += vy;
+    playerRect.y += vy;//whatever the position of the rectangle is will also be the position where the rectangel will be rendered
     shiftColliders();
 
     if((gLevels[gLevel].tile(playerRect.x, playerRect.y))->m > 0
@@ -788,17 +792,29 @@ void Player::renderLifeTexture(){
 		gLifeAvailableTexture.render(6*SCREEN_WIDTH/7+WIDTH*i, lifeYPos);
 	}
 }
-void Player::activatePowerUp(int id){
+
+void Player::activatePowerUp(int id, SDL_Rect& Rect){
 	switch(id){
 		case LIFE:
 			printf("life\n");
 			life++;
 			break;
 		case BOMB:
-			printf("bomb\n");
+            printf("bomb\n");
+            //turn the area around the bomb to grass
+            gLevels[gLevel].map[(Rect.x+10)/Tile::WIDTH][Rect.y/Tile::LENGTH]=gTiles[GRASS];//right
+            gLevels[gLevel].map[(Rect.x-10)/Tile::WIDTH][Rect.y/Tile::LENGTH]=gTiles[GRASS];//left
+            gLevels[gLevel].map[(Rect.x)/Tile::WIDTH][(Rect.y-10)/Tile::LENGTH]=gTiles[GRASS];//up
+            gLevels[gLevel].map[(Rect.x)/Tile::WIDTH][(Rect.y+10)/Tile::LENGTH]=gTiles[GRASS];//down
+            gLevels[gLevel].map[(Rect.x+10)/Tile::WIDTH][(Rect.y-10)/Tile::LENGTH]=gTiles[GRASS];//upper right
+            gLevels[gLevel].map[(Rect.x-10)/Tile::WIDTH][(Rect.y-10)/Tile::LENGTH]=gTiles[GRASS];//upper left
+            gLevels[gLevel].map[(Rect.x+10)/Tile::WIDTH][(Rect.y+10)/Tile::LENGTH]=gTiles[GRASS];//lower right
+            gLevels[gLevel].map[(Rect.x-10)/Tile::WIDTH][(Rect.y+10)/Tile::LENGTH]=gTiles[GRASS];//lower left
 			break;
 		case SHIELD:
 			printf("shield\n");
+			//add to life if hit
+
 			break;
 		case BULLETUPGRADE:
 			printf("bullet upgraded\n");
@@ -806,7 +822,7 @@ void Player::activatePowerUp(int id){
 	}
 }
 
-bool Bullet::move(){
+bool Bullet::move(Player p){
 	x += VEL*cos(PI*(dir+1)/2);
 	y += VEL*sin(PI*(dir+1)/2);
 
@@ -818,9 +834,9 @@ bool Bullet::move(){
 		return false;
 	}else if(gLevels[gLevel].tile(x, y) == gTiles[EMPTY]){
 		return false;
-	}/*else if(checkCollision(bullet, Player::gPlayers[1].getCollider())){
+	}else if(checkCollision(p.getCollider(),bullet)){
 		return false;
-	}*/
+	}
 	return true;
 }
 
@@ -947,6 +963,13 @@ bool checkCollision(Circle& c1, Circle& c2){
 	}
 	return false;
 }
+//for player and bullet collision
+/*bool checkCollision(Circle& c1, SDL_Point p){
+    if(sqrt(pow(c1.x-p.x, 2)+pow(c1.y-p.y, 2)) < c1.r){
+		return true;
+	}
+	return false;
+}*/
 bool checkCollision(Circle& c1, SDL_Rect r){
 	//Closest point on collision box
     int cX, cY;
