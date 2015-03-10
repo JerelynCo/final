@@ -31,7 +31,7 @@ enum Direction{
 };
 
 enum Controls{
-	UP, LEFT, DOWN, RIGHT, SHOOT
+	UP, LEFT, DOWN, RIGHT, SHOOT, PLACEBOMB
 };
 
 enum PowerUps{
@@ -145,7 +145,7 @@ class Map{
 	Tile* map[COLS][ROWS];
 
 };
-class Player;
+
 class Bullet{
  public:
 	static const int LENGTH = 5, WIDTH = 5, VEL = 5;
@@ -172,18 +172,18 @@ class Player{
 		LTexture* playerTex;
 		LTexture* playerLifeTex;
 		Circle collider;
-		SDL_Scancode con[5];
-
+		SDL_Scancode con[6];
+        bool bombEnable;
 		void shoot();
   public:
-    //std::vector<Bullet> gBullets;
+
 	static const int WIDTH = 20, LENGTH = 20;
 	static const int VEL = 2;
 	int life = 3;
 
-	Player(LTexture* texture, int lifeAvailableYPos, int x, int y, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot):
+	Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enable, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 		playerRect{x, y, texture->getWidth(), texture->getLength()},
-		dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2}, lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot} {};
+		dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2}, lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
 
 	void act(const Uint8*);
 	void act(SDL_Scancode);
@@ -193,6 +193,7 @@ class Player{
 	void render();
 	void renderLifeTexture();
 	void activatePowerUp(int id, SDL_Rect& Rect);
+	void placeBomb();
 
 
 };
@@ -215,6 +216,23 @@ class PowerUp{
 
 };
 
+class Bomb{
+    public:
+        static const int WIDTH = 20, LENGTH = 20;
+
+        int bombPosX, bombPosY;
+
+
+        Bomb(int x, int y);
+        void render();
+        void blowUp(int x, int y);
+};
+
+Bomb::Bomb(int x ,int y){
+    bombPosX = x;
+    bombPosY = y;
+
+}
 
 //Starts up SDL and creates window
 bool init();
@@ -243,7 +261,7 @@ TTF_Font* gFont = NULL;
 LTexture gPlayerOneTexture;
 LTexture gPlayerTwoTexture;
 
-LTexture gBombTexture;
+LTexture gBombPowerUPTexture;
 LTexture gShieldTexture;
 LTexture gLifeTexture;
 LTexture gBulletUpgradeTexture;
@@ -253,12 +271,15 @@ LTexture gPauseTextTexture;
 
 LTexture gLifeAvailableTexture;
 
+LTexture gBombTexture;
 std::vector<Map> gLevels;
 int gLevel = 0;
 
 std::vector<Player> gPlayers;
 std::vector<Bullet> gBullets;
 std::vector<PowerUp> gPowerUps;
+
+std::vector<Bomb> gBomb;
 
 std::random_device type;
 
@@ -288,8 +309,8 @@ int main(int argc, char *args[]){
 			bool quit = false;
 
 			//Create players
-			gPlayers.emplace_back(&gPlayerOneTexture, 15, 5, 5, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C);
-			gPlayers.emplace_back(&gPlayerTwoTexture, 37, SCREEN_WIDTH-Player::WIDTH-5, PLAYFIELD_LENGTH-Player::LENGTH-5, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N);
+			gPlayers.emplace_back(&gPlayerOneTexture, 15, 5, 5,true, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
+			gPlayers.emplace_back(&gPlayerTwoTexture, 37, SCREEN_WIDTH-Player::WIDTH-5, PLAYFIELD_LENGTH-Player::LENGTH-5,false, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
 
 			//Power ups variables
 			static const int NSETS = 4;
@@ -297,9 +318,10 @@ int main(int argc, char *args[]){
 			static const int DSPLYTIMEPWRUP = 8;
                                                               //LIFE, BOMB, SHIELD, BULLETUPGRADE
 			static const int powerUpsSet[NSETS][NPOWERUPS] = {{0, 0, 3, 2}, {0, 2, 0, 0}, {3, 0, 1, 0}, {0, 0, 2, 0}};
-			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombTexture, gShieldTexture, gBulletUpgradeTexture};
+			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombPowerUPTexture, gShieldTexture, gBulletUpgradeTexture};
 
 			int set = 0;
+			double time = 0.0;
 			bool nextSet = true;
 			int powerUpsTime[NSETS] = {2, 20, 40, 70};
 
@@ -407,23 +429,24 @@ int main(int argc, char *args[]){
 						}
 					}
 
-					/*for(int j = 0; j<gPlayers.size(); j++){
-                        for(int i = 0; i < gPlayers[j].gBullets.size(); ++i){
-                                                             // if 0 is changed to 1 seg fault happens
-                            if(gPlayers[j].gBullets[i].move(gPlayers[j].gBullets[i].bullet,j)){
-                                gPlayers[j].gBullets[i].render();
-                            }else{
-                                gPlayers[j].gBullets.erase(gPlayers[j].gBullets.begin()+i);
-                            }
-						}
-					}*/
-
-                    for(int i = 0; i < gBullets.size(); ++i){
+					for(int i = 0; i < gBullets.size(); ++i){
                         if(gBullets[i].move(gBullets[i].bullet)){
                             gBullets[i].render();
                         }else{
                             gBullets.erase(gBullets.begin()+i);
                             printf("bullet erased");
+                        }
+                    }
+
+                    for(int i = 0; i<gBomb.size(); i++){
+                        gBomb[i].render();
+                        //put a counter
+                        if(time<3.0){
+                            time+=(1/60);
+                        }
+                        else{
+                            gBomb[i].blowUp(gBomb[i].bombPosX, gBomb[i].bombPosY);
+                            gBomb.erase(gBomb.begin()+i);
                         }
                     }
 
@@ -726,7 +749,12 @@ void Player::act(const Uint8* state){
 }
 
 void Player::act(SDL_Scancode key){
-	if(key == con[SHOOT]){shoot();}
+	if(key == con[SHOOT]){
+        shoot();
+	}
+	if(key == con[PLACEBOMB]){
+        placeBomb();
+	}
 }
 
 void Player::move(int vx, int vy){
@@ -783,6 +811,11 @@ void Player::shoot(){
 	}
 }
 
+void Player::placeBomb(){
+    gBomb.emplace_back(playerRect.x, playerRect.y);
+    printf("bomb placed");
+}
+
 void Player::render(){
     playerTex->render(&playerRect, NULL, 90*dir);
 }
@@ -832,15 +865,8 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
 		case BOMB:
             printf("bomb\n");
             //turn the area around the bomb to grass
-            gLevels[gLevel].map[(Rect.x+25)/Tile::WIDTH][Rect.y/Tile::LENGTH]=gTiles[GRASS];//right
-            gLevels[gLevel].map[(Rect.x-25)/Tile::WIDTH][Rect.y/Tile::LENGTH]=gTiles[GRASS];//left
-            gLevels[gLevel].map[(Rect.x)/Tile::WIDTH][(Rect.y-25)/Tile::LENGTH]=gTiles[GRASS];//up
-            gLevels[gLevel].map[(Rect.x)/Tile::WIDTH][(Rect.y+25)/Tile::LENGTH]=gTiles[GRASS];//down
-            gLevels[gLevel].map[(Rect.x+25)/Tile::WIDTH][(Rect.y-25)/Tile::LENGTH]=gTiles[GRASS];//upper right
-            gLevels[gLevel].map[(Rect.x-25)/Tile::WIDTH][(Rect.y-25)/Tile::LENGTH]=gTiles[GRASS];//upper left
-            gLevels[gLevel].map[(Rect.x+25)/Tile::WIDTH][(Rect.y+25)/Tile::LENGTH]=gTiles[GRASS];//lower right
-            gLevels[gLevel].map[(Rect.x-25)/Tile::WIDTH][(Rect.y+25)/Tile::LENGTH]=gTiles[GRASS];//lower left
-			break;
+            bombEnable = true;
+            break;
 		case SHIELD:
 			printf("shield\n");
 			//add to life if hit
@@ -902,6 +928,22 @@ void Bullet::render(){
 	SDL_Rect bullet{(int) x, (int) y, WIDTH, LENGTH};
 	SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 	SDL_RenderFillRect(gRenderer, &bullet);
+}
+
+void Bomb::render(){
+    gBombTexture.render(bombPosX,bombPosY);
+}
+
+void Bomb::blowUp(int x, int y){
+    gLevels[gLevel].map[(x+25)/Tile::WIDTH][y/Tile::LENGTH]=gTiles[GRASS];//right
+    gLevels[gLevel].map[(x-25)/Tile::WIDTH][y/Tile::LENGTH]=gTiles[GRASS];//left
+    gLevels[gLevel].map[(x)/Tile::WIDTH][(y-25)/Tile::LENGTH]=gTiles[GRASS];//up
+    gLevels[gLevel].map[(x)/Tile::WIDTH][(y+25)/Tile::LENGTH]=gTiles[GRASS];//down
+    gLevels[gLevel].map[(x+25)/Tile::WIDTH][(y-25)/Tile::LENGTH]=gTiles[GRASS];//upper right
+    gLevels[gLevel].map[(x-25)/Tile::WIDTH][(y-25)/Tile::LENGTH]=gTiles[GRASS];//upper left
+    gLevels[gLevel].map[(x+25)/Tile::WIDTH][(y+25)/Tile::LENGTH]=gTiles[GRASS];//lower right
+    gLevels[gLevel].map[(x-25)/Tile::WIDTH][(y+25)/Tile::LENGTH]=gTiles[GRASS];//lower left
+
 }
 
 bool init(){
@@ -990,6 +1032,10 @@ bool loadMedia(){
 	}
 
 	//Load power up textures
+	if(!gBombPowerUPTexture.loadFromFile("Assets/bomb.png")){
+		printf("Failed to load bomb texture!\n");
+		success = false;
+	}
 	if(!gBombTexture.loadFromFile("Assets/bomb.png")){
 		printf("Failed to load bomb texture!\n");
 		success = false;
@@ -1065,7 +1111,7 @@ void close(){
 	gPauseTextTexture.free();
 	gTimeTextTexture.free();
 
-	gBombTexture.free();
+	gBombPowerUPTexture.free();
 	gShieldTexture.free();
 	gLifeTexture.free();
 
