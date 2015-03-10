@@ -145,6 +145,24 @@ class Map{
 	Tile* map[COLS][ROWS];
 
 };
+class Player;
+class Bullet{
+ public:
+	static const int LENGTH = 15, WIDTH = 15, VEL = 5;
+	double x, y;
+	int dir;
+
+	Bullet(double xStart, double yStart, int direction):
+		x(xStart), y(yStart), dir(direction){};
+		//bullet{(int) x, (int) y, WIDTH, LENGTH}{}
+
+	//bool move(SDL_Rect& bul1, SDL_Rect& bul2);
+	//bool move(SDL_Rect& bul1,int j);
+	bool move();
+	void render();
+	//private:
+		SDL_Rect bullet;
+};
 
 class Player{
 
@@ -158,6 +176,7 @@ class Player{
 
 		void shoot();
   public:
+    //std::vector<Bullet> gBullets;
 	static const int WIDTH = 20, LENGTH = 20;
 	static const int VEL = 2;
 	int life = 3;
@@ -196,21 +215,6 @@ class PowerUp{
 
 };
 
-class Bullet{
- public:
-	static const int LENGTH = 5, WIDTH = 5, VEL = 5;
-	double x, y;
-	int dir;
-
-	Bullet(double xStart, double yStart, int direction):
-		x(xStart), y(yStart), dir(direction){};
-		//bullet{(int) x, (int) y, WIDTH, LENGTH}{}
-
-	bool move(Player p);
-	void render();
-	private:
-		SDL_Rect bullet;
-};
 
 //Starts up SDL and creates window
 bool init();
@@ -403,16 +407,34 @@ int main(int argc, char *args[]){
 						}
 					}
 
-					for(int i = 0; i < gBullets.size(); ++i){
-                        for(int j = 0; j<gPlayers.size(); j++){
-                            if(gBullets[i].move(gPlayers[j])){
-                                gBullets[i].render();
+					/*for(int j = 0; j<gPlayers.size(); j++){
+                        for(int i = 0; i < gPlayers[j].gBullets.size(); ++i){
+                                                             // if 0 is changed to 1 seg fault happens
+                            if(gPlayers[j].gBullets[i].move(gPlayers[j].gBullets[i].bullet,j)){
+                                gPlayers[j].gBullets[i].render();
                             }else{
-                                gBullets.erase(gBullets.begin()+i);
+                                gPlayers[j].gBullets.erase(gPlayers[j].gBullets.begin()+i);
                             }
 						}
-					}
+					}*/
 
+                    for(int i = 0; i < gBullets.size(); ++i){
+                        if(gBullets[i].move()){
+                            gBullets[i].render();
+                        }else{
+                            gBullets.erase(gBullets.begin()+i);
+                            printf("bullet erased");
+                        }
+                    }
+
+                    /*for(int i = 0; i < gPlayers[0].gBullets.size(); ++i){
+                                                         // if 0 is changed to 1 seg fault happens
+                        if(gPlayers[0].gBullets[i].move(gPlayers[0].gBullets[i].bullet,0)){
+                            gPlayers[0].gBullets[i].render();
+                        }else{
+                            gPlayers[0].gBullets.erase(gPlayers[0].gBullets.begin()+i);
+                        }
+                    }*/
 					for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].render();
 						for(int j = 0; j < gPowerUps.size(); j++){
@@ -748,7 +770,14 @@ void Player::shiftColliders(){
 }
 
 void Player::shoot(){
-	gBullets.emplace_back(playerRect.x+WIDTH/2, playerRect.y+LENGTH/2, dir);
+    if(dir == WEST||dir == EAST){
+        gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+LENGTH/2), dir);
+        printf("BULLET");
+	}
+	else{
+        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH), dir);
+        printf("BULLET");
+	}
 }
 
 void Player::render(){
@@ -802,14 +831,14 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
 		case BOMB:
             printf("bomb\n");
             //turn the area around the bomb to grass
-            gLevels[gLevel].map[(Rect.x+10)/Tile::WIDTH][Rect.y/Tile::LENGTH]=gTiles[GRASS];//right
-            gLevels[gLevel].map[(Rect.x-10)/Tile::WIDTH][Rect.y/Tile::LENGTH]=gTiles[GRASS];//left
-            gLevels[gLevel].map[(Rect.x)/Tile::WIDTH][(Rect.y-10)/Tile::LENGTH]=gTiles[GRASS];//up
-            gLevels[gLevel].map[(Rect.x)/Tile::WIDTH][(Rect.y+10)/Tile::LENGTH]=gTiles[GRASS];//down
-            gLevels[gLevel].map[(Rect.x+10)/Tile::WIDTH][(Rect.y-10)/Tile::LENGTH]=gTiles[GRASS];//upper right
-            gLevels[gLevel].map[(Rect.x-10)/Tile::WIDTH][(Rect.y-10)/Tile::LENGTH]=gTiles[GRASS];//upper left
-            gLevels[gLevel].map[(Rect.x+10)/Tile::WIDTH][(Rect.y+10)/Tile::LENGTH]=gTiles[GRASS];//lower right
-            gLevels[gLevel].map[(Rect.x-10)/Tile::WIDTH][(Rect.y+10)/Tile::LENGTH]=gTiles[GRASS];//lower left
+            gLevels[gLevel].map[(Rect.x+25)/Tile::WIDTH][Rect.y/Tile::LENGTH]=gTiles[GRASS];//right
+            gLevels[gLevel].map[(Rect.x-25)/Tile::WIDTH][Rect.y/Tile::LENGTH]=gTiles[GRASS];//left
+            gLevels[gLevel].map[(Rect.x)/Tile::WIDTH][(Rect.y-25)/Tile::LENGTH]=gTiles[GRASS];//up
+            gLevels[gLevel].map[(Rect.x)/Tile::WIDTH][(Rect.y+25)/Tile::LENGTH]=gTiles[GRASS];//down
+            gLevels[gLevel].map[(Rect.x+25)/Tile::WIDTH][(Rect.y-25)/Tile::LENGTH]=gTiles[GRASS];//upper right
+            gLevels[gLevel].map[(Rect.x-25)/Tile::WIDTH][(Rect.y-25)/Tile::LENGTH]=gTiles[GRASS];//upper left
+            gLevels[gLevel].map[(Rect.x+25)/Tile::WIDTH][(Rect.y+25)/Tile::LENGTH]=gTiles[GRASS];//lower right
+            gLevels[gLevel].map[(Rect.x-25)/Tile::WIDTH][(Rect.y+25)/Tile::LENGTH]=gTiles[GRASS];//lower left
 			break;
 		case SHIELD:
 			printf("shield\n");
@@ -822,7 +851,7 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
 	}
 }
 
-bool Bullet::move(Player p){
+bool Bullet::move(){
 	x += VEL*cos(PI*(dir+1)/2);
 	y += VEL*sin(PI*(dir+1)/2);
 
@@ -834,9 +863,30 @@ bool Bullet::move(Player p){
 		return false;
 	}else if(gLevels[gLevel].tile(x, y) == gTiles[EMPTY]){
 		return false;
-	}else if(checkCollision(p.getCollider(),bullet)){
-		return false;
 	}
+	if(checkCollision(gPlayers[0].getCollider(),bullet)){
+        printf("BULLET collided");
+        return false;
+    }
+    if(checkCollision(gPlayers[1].getCollider(),bullet)){
+        printf("BULLET collided");
+        return false;
+    }
+	//checks if the bullet of other player has collided with player
+	//fix bullet on player collision
+	/*if(j == 0){          //player1     //bullet of player 2
+        if(checkCollision(gPlayers[1].getCollider(),bullet)){
+            return false;
+        }
+	}
+	else if(j == 1){
+        if(checkCollision(gPlayers[0].getCollider(),bul1)){
+            return false;
+        }
+	}*/
+	/*else if(checkCollision(gPlayers[1].getCollider(),bul1)||checkCollision(gPlayers[0].getCollider(),bul1)){
+		return false;
+	}*/
 	return true;
 }
 
