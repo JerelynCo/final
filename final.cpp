@@ -321,7 +321,7 @@ int main(int argc, char *args[]){
 			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombPowerUPTexture, gShieldTexture, gBulletUpgradeTexture};
 
 			int set = 0;
-			double time = 0.0;
+			int bombtime = 10;
 			bool nextSet = true;
 			int powerUpsTime[NSETS] = {2, 20, 40, 70};
 
@@ -441,15 +441,28 @@ int main(int argc, char *args[]){
                     for(int i = 0; i<gBomb.size(); i++){
                         gBomb[i].render();
                         //put a counter
-                        if(time<3.0){
-                            time+=(1/60);
+                        //gBomb[i].blowUp(gBomb[i].bombPosX, gBomb[i].bombPosY);
+                        //gBomb.erase(gBomb.begin()+i);
+                        /*if(bombtime<1.0/60.0){
+                            bombtime += 1.0/60.0;
+                            printf("BOMB");
                         }
                         else{
-                            gBomb[i].blowUp(gBomb[i].bombPosX, gBomb[i].bombPosY);
-                            gBomb.erase(gBomb.begin()+i);
-                        }
+                            printf("EXPLODE");
+                           for(int j = 0; j<gBomb.size(); j++){
+                                gBomb[j].blowUp(gBomb[j].bombPosX, gBomb[j].bombPosY);
+                                gBomb.erase(gBomb.begin()+j);
+                           }
+                        }*/
                     }
-
+                    //delay
+                    if((gTimer.getTicks()/1000)>bombtime){
+                        for(int j = 0; j<gBomb.size(); j++){
+                            gBomb[j].blowUp(gBomb[j].bombPosX, gBomb[j].bombPosY);
+                            gBomb.erase(gBomb.begin()+j);
+                       }
+                       bombtime+=10;
+                    }
                     for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].render();
 						for(int j = 0; j < gPowerUps.size(); j++){
