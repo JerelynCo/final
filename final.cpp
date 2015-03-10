@@ -148,17 +148,17 @@ class Map{
 class Player;
 class Bullet{
  public:
-	static const int LENGTH = 15, WIDTH = 15, VEL = 5;
-	double x, y;
+	static const int LENGTH = 5, WIDTH = 5, VEL = 5;
+	double x, y, w, h;
 	int dir;
 
 	Bullet(double xStart, double yStart, int direction):
-		x(xStart), y(yStart), dir(direction){};
+		x(xStart), y(yStart), w(WIDTH), h(LENGTH), dir(direction){};
 		//bullet{(int) x, (int) y, WIDTH, LENGTH}{}
 
 	//bool move(SDL_Rect& bul1, SDL_Rect& bul2);
 	//bool move(SDL_Rect& bul1,int j);
-	bool move();
+	bool move(SDL_Rect& rect);
 	void render();
 	//private:
 		SDL_Rect bullet;
@@ -419,7 +419,7 @@ int main(int argc, char *args[]){
 					}*/
 
                     for(int i = 0; i < gBullets.size(); ++i){
-                        if(gBullets[i].move()){
+                        if(gBullets[i].move(gBullets[i].bullet)){
                             gBullets[i].render();
                         }else{
                             gBullets.erase(gBullets.begin()+i);
@@ -427,20 +427,14 @@ int main(int argc, char *args[]){
                         }
                     }
 
-                    /*for(int i = 0; i < gPlayers[0].gBullets.size(); ++i){
-                                                         // if 0 is changed to 1 seg fault happens
-                        if(gPlayers[0].gBullets[i].move(gPlayers[0].gBullets[i].bullet,0)){
-                            gPlayers[0].gBullets[i].render();
-                        }else{
-                            gPlayers[0].gBullets.erase(gPlayers[0].gBullets.begin()+i);
-                        }
-                    }*/
-					for(int i = 0; i < gPlayers.size(); i++){
+                    for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].render();
 						for(int j = 0; j < gPowerUps.size(); j++){
 							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
-						    	gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID(),gPowerUps[j].powerUpRect);
-						    	gPowerUps.erase(gPowerUps.begin()+j);
+                                //for(int k = 0; k < gBullets.size(); ++k){
+                                    gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID(),gPowerUps[j].powerUpRect);
+                                    gPowerUps.erase(gPowerUps.begin()+j);
+                                //}
 						    }
 						}
 					}
@@ -770,12 +764,21 @@ void Player::shiftColliders(){
 }
 
 void Player::shoot(){
-    if(dir == WEST||dir == EAST){
+   //gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH/2), dir);
+    if(dir == EAST){
         gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+LENGTH/2), dir);
         printf("BULLET");
 	}
-	else{
+	else if(dir == WEST){
+        gBullets.emplace_back((playerRect.x-WIDTH), (playerRect.y+LENGTH/2), dir);
+        printf("BULLET");
+	}
+	else if(dir == SOUTH){
         gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH), dir);
+        printf("BULLET");
+	}
+	else if(dir == NORTH){
+        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-LENGTH), dir);
         printf("BULLET");
 	}
 }
@@ -800,8 +803,6 @@ PowerUp::PowerUp(LTexture* texture, int pwrUp_id){
 	powerUpTex = texture;
 	id = pwrUp_id;
 	collider = {x[randInd]+Tile::WIDTH/5, y[randInd]+Tile::LENGTH/5, WIDTH/2};
-
-
 }
 
 void PowerUp::render(){
@@ -843,7 +844,12 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
 		case SHIELD:
 			printf("shield\n");
 			//add to life if hit
-
+            /*if(checkCollision(gPlayers[0].getCollider())){
+                life++;
+            }
+            if(checkCollision(gPlayers[1].getCollider())){
+                life++;
+            }*/
 			break;
 		case BULLETUPGRADE:
 			printf("bullet upgraded\n");
@@ -851,7 +857,7 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
 	}
 }
 
-bool Bullet::move(){
+bool Bullet::move(SDL_Rect& rect){
 	x += VEL*cos(PI*(dir+1)/2);
 	y += VEL*sin(PI*(dir+1)/2);
 
@@ -864,12 +870,14 @@ bool Bullet::move(){
 	}else if(gLevels[gLevel].tile(x, y) == gTiles[EMPTY]){
 		return false;
 	}
-	if(checkCollision(gPlayers[0].getCollider(),bullet)){
+	if(checkCollision(gPlayers[0].getCollider(),rect)){
         printf("BULLET collided");
+        gPlayers[0].life--;
         return false;
     }
-    if(checkCollision(gPlayers[1].getCollider(),bullet)){
+    if(checkCollision(gPlayers[1].getCollider(),rect)){
         printf("BULLET collided");
+        gPlayers[1].life--;
         return false;
     }
 	//checks if the bullet of other player has collided with player
