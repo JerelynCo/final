@@ -222,7 +222,7 @@ class Bomb{
 
         int bombPosX, bombPosY;
 
-
+        //Tile& tile(int x, int y);
         Bomb(int x, int y);
         void render();
         void blowUp(int x, int y);
@@ -309,7 +309,7 @@ int main(int argc, char *args[]){
 			bool quit = false;
 
 			//Create players
-			gPlayers.emplace_back(&gPlayerOneTexture, 15, 5, 5,false, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
+			gPlayers.emplace_back(&gPlayerOneTexture, 15, 5, 5,true, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
 			gPlayers.emplace_back(&gPlayerTwoTexture, 37, SCREEN_WIDTH-Player::WIDTH-5, PLAYFIELD_LENGTH-Player::LENGTH-5,false, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
 
 			//Power ups variables
@@ -941,15 +941,32 @@ void Bomb::render(){
 }
 
 void Bomb::blowUp(int x, int y){
-    gLevels[gLevel].map[(x+25)/Tile::WIDTH][y/Tile::LENGTH]=gTiles[GRASS];//right
-    gLevels[gLevel].map[(x-25)/Tile::WIDTH][y/Tile::LENGTH]=gTiles[GRASS];//left
-    gLevels[gLevel].map[(x)/Tile::WIDTH][(y-25)/Tile::LENGTH]=gTiles[GRASS];//up
-    gLevels[gLevel].map[(x)/Tile::WIDTH][(y+25)/Tile::LENGTH]=gTiles[GRASS];//down
-    gLevels[gLevel].map[(x+25)/Tile::WIDTH][(y-25)/Tile::LENGTH]=gTiles[GRASS];//upper right
-    gLevels[gLevel].map[(x-25)/Tile::WIDTH][(y-25)/Tile::LENGTH]=gTiles[GRASS];//upper left
-    gLevels[gLevel].map[(x+25)/Tile::WIDTH][(y+25)/Tile::LENGTH]=gTiles[GRASS];//lower right
-    gLevels[gLevel].map[(x-25)/Tile::WIDTH][(y+25)/Tile::LENGTH]=gTiles[GRASS];//lower left
-
+    for(int i = 1; i<=2; i++){
+        if(gLevels[gLevel].tile((x+30*i), y) == gTiles[BRICK]){
+            gLevels[gLevel].map[(x+30*i)/Tile::WIDTH][y/Tile::LENGTH]=gTiles[GRASS];//right
+        }
+        if(gLevels[gLevel].tile((x-30*i), y) == gTiles[BRICK]){
+            gLevels[gLevel].map[(x-30*i)/Tile::WIDTH][y/Tile::LENGTH]=gTiles[GRASS];//left
+        }
+        if(gLevels[gLevel].tile((x), (y-30*i)) == gTiles[BRICK]){
+            gLevels[gLevel].map[(x)/Tile::WIDTH][(y-30*i)/Tile::LENGTH]=gTiles[GRASS];//up
+        }
+        if(gLevels[gLevel].tile((x), (y+30*i)) == gTiles[BRICK]){
+            gLevels[gLevel].map[(x)/Tile::WIDTH][(y+30*i)/Tile::LENGTH]=gTiles[GRASS];//down
+        }
+        if(gLevels[gLevel].tile((x+30*i), (y-30*i)) == gTiles[BRICK]){
+            gLevels[gLevel].map[(x+30*i)/Tile::WIDTH][(y-30*i)/Tile::LENGTH]=gTiles[GRASS];//upper right
+        }
+        if(gLevels[gLevel].tile((x-30*i), (y-30*i)) == gTiles[BRICK]){
+            gLevels[gLevel].map[(x-30*i)/Tile::WIDTH][(y-30*i)/Tile::LENGTH]=gTiles[GRASS];//upper left
+        }
+        if(gLevels[gLevel].tile((x+30*i), (y+30*i)) == gTiles[BRICK]){
+            gLevels[gLevel].map[(x+30*i)/Tile::WIDTH][(y+30*i)/Tile::LENGTH]=gTiles[GRASS];//lower right
+        }
+        if(gLevels[gLevel].tile((x-30*i), (y+30*i)) == gTiles[BRICK]){
+            gLevels[gLevel].map[(x-30*i)/Tile::WIDTH][(y+30*i)/Tile::LENGTH]=gTiles[GRASS];//lower left
+        }
+    }
 }
 
 bool init(){
