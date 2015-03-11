@@ -183,9 +183,9 @@ class Player{
 	int life = 3;
     bool bulletUpEnable;
 
-	Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enable,bool enableTwo, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
+	Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enableBombUp, bool enableBulletUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 		playerRect{x, y, texture->getWidth(), texture->getLength()},
-		dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2},bombEnable(enable),bulletUpEnable(enableTwo) ,lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
+		dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2},bombEnable(enableBombUp), bulletUpEnable(enableBulletUp) ,lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
 
 	void act(const Uint8*);
 	void act(SDL_Scancode);
@@ -317,7 +317,7 @@ int main(int argc, char *args[]){
 			static const int NSETS = 4;
 			static const int NPOWERUPS = 4;
 			static const int DSPLYTIMEPWRUP = 8;
-                                                              //LIFE, BOMB, SHIELD, BULLETUPGRADE
+            //LIFE, BOMB, SHIELD, BULLETUPGRADE
 			static const int powerUpsSet[NSETS][NPOWERUPS] = {{0, 0, 3, 2}, {0, 2, 0, 0}, {3, 0, 1, 0}, {0, 0, 2, 0}};
 			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombPowerUPTexture, gShieldTexture, gBulletUpgradeTexture};
 
