@@ -183,7 +183,7 @@ class Player{
 
 	Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enable, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 		playerRect{x, y, texture->getWidth(), texture->getLength()},
-		dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2}, lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
+		dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2},bombEnable(enable), lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
 
 	void act(const Uint8*);
 	void act(SDL_Scancode);
@@ -309,7 +309,7 @@ int main(int argc, char *args[]){
 			bool quit = false;
 
 			//Create players
-			gPlayers.emplace_back(&gPlayerOneTexture, 15, 5, 5,true, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
+			gPlayers.emplace_back(&gPlayerOneTexture, 15, 5, 5,false, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
 			gPlayers.emplace_back(&gPlayerTwoTexture, 37, SCREEN_WIDTH-Player::WIDTH-5, PLAYFIELD_LENGTH-Player::LENGTH-5,false, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
 
 			//Power ups variables
@@ -321,9 +321,11 @@ int main(int argc, char *args[]){
 			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombPowerUPTexture, gShieldTexture, gBulletUpgradeTexture};
 
 			int set = 0;
-			int bombtime = 10;
+			int bombtime = 5;
 			bool nextSet = true;
 			int powerUpsTime[NSETS] = {2, 20, 40, 70};
+
+			int counter = 0;
 
 			//Event handler
 			SDL_Event event;
@@ -360,9 +362,10 @@ int main(int argc, char *args[]){
 							}
 
 						}else if(event.key.repeat == 0){
-							for(int i = 0; i < gPlayers.size(); ++i){
-								gPlayers[i].act(event.key.keysym.scancode);
-							}
+							//for(int i = 0; i < gPlayers.size(); ++i){
+								gPlayers[0].act(event.key.keysym.scancode);
+								gPlayers[1].act(event.key.keysym.scancode);
+							//}
 						}
 					}
 				}
@@ -440,28 +443,18 @@ int main(int argc, char *args[]){
 
                     for(int i = 0; i<gBomb.size(); i++){
                         gBomb[i].render();
-                        //put a counter
-                        //gBomb[i].blowUp(gBomb[i].bombPosX, gBomb[i].bombPosY);
-                        //gBomb.erase(gBomb.begin()+i);
-                        /*if(bombtime<1.0/60.0){
-                            bombtime += 1.0/60.0;
-                            printf("BOMB");
-                        }
-                        else{
-                            printf("EXPLODE");
-                           for(int j = 0; j<gBomb.size(); j++){
-                                gBomb[j].blowUp(gBomb[j].bombPosX, gBomb[j].bombPosY);
-                                gBomb.erase(gBomb.begin()+j);
-                           }
-                        }*/
                     }
-                    //delay
+                    //bomb blows up every 10 seconds
                     if((gTimer.getTicks()/1000)>bombtime){
-                        for(int j = 0; j<gBomb.size(); j++){
-                            gBomb[j].blowUp(gBomb[j].bombPosX, gBomb[j].bombPosY);
-                            gBomb.erase(gBomb.begin()+j);
+                       //can't be placed in one loop or else segmentation fault happens
+                       for(int i = 0; i<gBomb.size(); i++){
+                            gBomb[i].blowUp(gBomb[i].bombPosX, gBomb[i].bombPosY);
                        }
-                       bombtime+=10;
+                       for(auto &Bomb : gBomb){
+                            gBomb.erase(gBomb.begin()+counter);
+                            counter++;
+                       }
+                       bombtime+=5;
                     }
                     for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].render();
@@ -765,7 +758,7 @@ void Player::act(SDL_Scancode key){
 	if(key == con[SHOOT]){
         shoot();
 	}
-	if(key == con[PLACEBOMB]){
+	if(key == con[PLACEBOMB]&&bombEnable == true){
         placeBomb();
 	}
 }
