@@ -257,7 +257,6 @@ TTF_Font* gFont = NULL;
 LTexture gPlayerOneTexture;
 LTexture gPlayerTwoTexture;
 
-
 LTexture gBombPowerUPTexture;
 LTexture gShieldTexture;
 LTexture gLifeTexture;
@@ -308,7 +307,7 @@ int main(int argc, char *args[]){
 			bool quit = false;
 
 			//initial player values
-			bool enableBombUp = true;
+			bool enableBombUp = false;
 			bool enableBulletUp = false;
 			bool enableShieldUp = false;
 			int p1LifeAvailablePosY = 15;
@@ -459,6 +458,7 @@ int main(int argc, char *args[]){
 
                     for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].render();
+
 						if(gPlayers[i].shieldEnable == true && gPlayers[i].shieldTimer.getTicks()/1000>Player::SHIELD_DURATION){
                             gPlayers[i].shieldEnable = false;
                             printf("stop shield");
@@ -470,6 +470,18 @@ int main(int argc, char *args[]){
 						    }
 						}
 					}
+                    if(gPlayers[0].shieldEnable == true){
+                        gPlayerOneTexture.loadFromFile("Assets/p1_shield.png");
+                    }
+                    else{
+                        gPlayerOneTexture.loadFromFile("Assets/p1.png");
+                    }
+                    if(gPlayers[1].shieldEnable == true){
+                        gPlayerTwoTexture.loadFromFile("Assets/p2_shield.png");
+                    }
+                    else{
+                        gPlayerTwoTexture.loadFromFile("Assets/p2.png");
+                    }
 				}
 				else{
 					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
@@ -751,7 +763,6 @@ void Player::act(const Uint8* state){
 }
 
 void Player::act(SDL_Scancode key){
-
 	if(key == con[SHOOT]){
         shoot();
 	}
@@ -840,7 +851,7 @@ bool Bullet::blanks(){
 }
 
 void Player::render(){
-    playerTex->render(&playerRect, NULL, 90*dir);
+     playerTex->render(&playerRect, NULL, 90*dir);
 }
 
 void Player::renderLifeTexture(){
@@ -1035,7 +1046,6 @@ bool loadMedia(){
 		gTiles[WATER] = new Tile({64, 0, 32, 32}, 1);
 		gTiles[EMPTY] = new Tile({96, 0, 32, 32}, 3);
 	}
-
 	//Load player textures
 	if(!gPlayerOneTexture.loadFromFile("Assets/p1.png")){
 		printf("Failed to load player 1 texture!\n");
@@ -1045,7 +1055,7 @@ bool loadMedia(){
 		printf("Failed to load player 2 texture!\n");
 		success = false;
 	}
-	//Load power up textures
+    //Load power up textures
 	if(!gBombPowerUPTexture.loadFromFile("Assets/bomb.png")){
 		printf("Failed to load bomb texture!\n");
 		success = false;
