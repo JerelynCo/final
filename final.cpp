@@ -1,9 +1,3 @@
-/*
-Compiled via command line using:
-	g++ ballHell.cpp -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -o final
-*/
-
-//Using SDL, SDL_image, standard IO, vectors, and strings
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -18,9 +12,9 @@ Compiled via command line using:
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 1170;
-const int SCREEN_LENGTH = 600;
-const int SCOREBOARD_LENGTH = 60;
-const int PLAYFIELD_LENGTH = SCREEN_LENGTH-SCOREBOARD_LENGTH;
+const int SCREEN_HEIGHT = 600;
+const int SCOREBOARD_HEIGHT = 60;
+const int PLAYFIELD_HEIGHT = SCREEN_HEIGHT-SCOREBOARD_HEIGHT;
 
 enum Terrain{
 	GRASS, BRICK, WATER, EMPTY
@@ -117,122 +111,114 @@ class LTimer{
 		//Checks the status of the timer
 		bool isStarted();
 		bool isPaused();
-
 };
 
 class Tile{
- public:
-	static const int LENGTH = 30, WIDTH = 30;
+	public:
+		static const int HEIGHT = 30, WIDTH = 30;
 
-	SDL_Rect t;
-	const Uint8 m;
+		SDL_Rect t;
+		const Uint8 m;
 
-	Tile(SDL_Rect tile, Uint8 mobility):
-		t(tile), m(mobility) {};
+		Tile(SDL_Rect tile, Uint8 mobility):
+			t(tile), m(mobility) {};
 };
 
 
 class Map{
 
 		SDL_Rect t;
- public:
-	static const int ROWS = PLAYFIELD_LENGTH/Tile::LENGTH, COLS = SCREEN_WIDTH/Tile::WIDTH;
+ 	public:
+		static const int ROWS = PLAYFIELD_HEIGHT/Tile::HEIGHT, COLS = SCREEN_WIDTH/Tile::WIDTH;
 
-	Map();
+		Map();
 
-	Tile* tile(int, int);
-	void hit(int, int);
-	void render();
+		Tile* tile(int, int);
+		void hit(int, int);
+		void render();
 
-	Tile* map[COLS][ROWS];
+		Tile* map[COLS][ROWS];
 
 };
 
 class Bullet{
- public:
-	static const int LENGTH = 5, WIDTH = 5, VEL = 5;
-	double x, y, w, h;
-	int dir;
+	public:
+		static const int HEIGHT = 5, WIDTH = 5, VEL = 5;
+		double x, y, w, h;
+		int dir;
 
-	Bullet(double xStart, double yStart, int direction):
-		x(xStart), y(yStart), w(WIDTH), h(LENGTH), dir(direction){};
-		//bullet{(int) x, (int) y, WIDTH, LENGTH}{}
+		Bullet(double xStart, double yStart, int direction):
+			x(xStart), y(yStart), w(WIDTH), h(HEIGHT), dir(direction){};
 
-	//bool move(SDL_Rect& bul1, SDL_Rect& bul2);
-	//bool move(SDL_Rect& bul1,int j);
-	bool move(SDL_Rect& rect);
-	void render();
-	//private:
+		bool move();
+		void render();
 		SDL_Rect bullet;
 };
 
-class Player{
-
-		int dir;
-		int lifeYPos;
-		SDL_Rect playerRect;
-		LTexture* playerTex;
-		LTexture* playerLifeTex;
-		Circle collider;
-		SDL_Scancode con[6];
-        bool bombEnable;
-
-		void shoot();
-  public:
-
-	static const int WIDTH = 20, LENGTH = 20;
-	static const int VEL = 2;
-	int life = 3;
+class Player{	
+	
     bool bulletUpEnable;
+    bool bombEnable;
+    int dir;
+	int lifeYPos;
+	SDL_Rect playerRect;
+	LTexture* playerTex;
+	LTexture* playerLifeTex;
+	Circle collider;
+	SDL_Scancode con[6];
 
-	Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enableBombUp, bool enableBulletUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
-		playerRect{x, y, texture->getWidth(), texture->getLength()},
-		dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2},bombEnable(enableBombUp), bulletUpEnable(enableBulletUp) ,lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
+	public:
+		int life = 3;
+		static const int WIDTH = 20, HEIGHT = 20;
+		static const int VEL = 2;
 
-	void act(const Uint8*);
-	void act(SDL_Scancode);
-	void move(int, int);
-	Circle& getCollider();
-	void shiftColliders();
-	void render();
-	void renderLifeTexture();
-	void activatePowerUp(int id, SDL_Rect& Rect);
-	void placeBomb();
+		Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enableBombUp, bool enableBulletUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
+			playerRect{x, y, texture->getWidth(), texture->getLength()},
+			dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2},bombEnable(enableBombUp), bulletUpEnable(enableBulletUp) ,lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
 
-
+		void act(const Uint8*);
+		void act(SDL_Scancode);
+		void move(int, int);
+		Circle& getCollider();
+		void shiftColliders();
+		void render();
+		void renderLifeTexture();
+		void activatePowerUp(int id, SDL_Rect& Rect);
+		void placeBomb();
+		void shoot();
 };
 
 class PowerUp{
- 		int id;
+ 	public:
+	 	int id;
 		Circle collider;
 
 		LTexture* powerUpTex;
 		//Rect is changed to public
- public:
-    SDL_Rect powerUpRect;
-	static const int WIDTH = 20, LENGTH = 20;
+	    SDL_Rect powerUpRect;
+		static const int WIDTH = 20, HEIGHT = 20;
 
-	PowerUp(LTexture* texture, int pwrUp_id);
+		PowerUp(LTexture* texture, int pwrUp_id);
 
-	void render();
-	Circle& getCollider();
-	int getPowerUpID();
+		void render();
+		Circle& getCollider();
+		int getPowerUpID();
 
 };
 
 class Bomb{
 
     public:
-        static const int WIDTH = 20, LENGTH = 20;
+        static const int WIDTH = 20, HEIGHT = 20;
         static const int TIMER = 5;
 
         int bombPosX, bombPosY;
         LTimer timer;
 
-
         //Tile& tile(int x, int y);
         Bomb(int x, int y):
             bombPosX(x), bombPosY(y) {timer.start();};
+        
         void render();
         void blowUp(int x, int y);
 
@@ -301,7 +287,7 @@ Tile* gTiles[4];
 int main(int argc, char *args[]){
 	gTimer.start();
 	if(gTimer.isStarted()){
-		printf("Start");
+		printf("Timer Started\n");
 	}
 	//Start up SDL and create window
 	if(!init()){
@@ -314,11 +300,15 @@ int main(int argc, char *args[]){
 			//Main loop flag
 			bool quit = false;
 
+			//initial player values
+			bool enableBombUp, enableBulletUp = false;
+			int p1LifeAvailablePosY = 15;
+			int p2LifeAvailablePosY= 37;
+			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
 
 			//Create players
-			gPlayers.emplace_back(&gPlayerOneTexture, 15, 5, 5,true,false, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
-			gPlayers.emplace_back(&gPlayerTwoTexture, 37, SCREEN_WIDTH-Player::WIDTH-5, PLAYFIELD_LENGTH-Player::LENGTH-5,false,false, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
-
+			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosY, p1_posX, p1_posY, enableBombUp, enableBulletUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
+			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosY, p2_posX, p2_posY, enableBombUp, enableBulletUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
 
 			//Power ups variables
 			static const int NSETS = 4;
@@ -333,9 +323,7 @@ int main(int argc, char *args[]){
 			int bombtime = 5;
 			bool nextSet = true;
 			int powerUpsTime[NSETS] = {2, 20, 40, 70};
-
 			int counter = 0;
-
 
 			//Event handler
 			SDL_Event event;
@@ -372,11 +360,9 @@ int main(int argc, char *args[]){
 							}
 
 						}else if(event.key.repeat == 0){
-
-							//for(int i = 0; i < gPlayers.size(); ++i){
-								gPlayers[0].act(event.key.keysym.scancode);
-								gPlayers[1].act(event.key.keysym.scancode);
-							//}
+							for(int i = 0; i < gPlayers.size(); ++i){
+								gPlayers[i].act(event.key.keysym.scancode);
+							}
 						}
 					}
 				}
@@ -385,8 +371,8 @@ int main(int argc, char *args[]){
 					gPlayers[i].act(state);
 				}
 
-
-				if(nextSet && set < NSETS){//what does this mean?
+				//Loads new set of powerups when nextSet flag is set to true (time dependent) 
+				if(nextSet && set < NSETS){
 					for(int i = 0; i < NPOWERUPS; i++){
 						for(int j = 0; j < powerUpsSet[set][i]; j++){
 							gPowerUps.emplace_back(&powerUpsTex[i], i);
@@ -398,8 +384,8 @@ int main(int argc, char *args[]){
 				if(gTimer.isStarted() && !gTimer.isPaused()){
 
 					//Viewports
-					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_LENGTH};
-					SDL_Rect playfield = {0, SCOREBOARD_LENGTH, SCREEN_WIDTH, PLAYFIELD_LENGTH};
+					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
+					SDL_Rect playfield = {0, SCOREBOARD_HEIGHT, SCREEN_WIDTH, PLAYFIELD_HEIGHT};
 
 					SDL_RenderClear(gRenderer);
 					SDL_RenderSetViewport(gRenderer, &scoreboard);
@@ -416,7 +402,7 @@ int main(int argc, char *args[]){
 						printf("Unable to render time texture!\n");
 					}
 
-					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth())/2, (SCOREBOARD_LENGTH-gTimeTextTexture.getLength())/2);
+					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth())/2, (SCOREBOARD_HEIGHT-gTimeTextTexture.getLength())/2);
 					gPlayerOneTexture.render(6*SCREEN_WIDTH/7-2*Player::WIDTH, 15);
 					gPlayerTwoTexture.render(6*SCREEN_WIDTH/7-2*Player::WIDTH, 37);
 
@@ -425,9 +411,7 @@ int main(int argc, char *args[]){
 					}
 
 					SDL_RenderSetViewport(gRenderer, &playfield);
-
 					gLevels[gLevel].render();
-
 
 					if(gTimer.getTicks()/1000 > powerUpsTime[set] && set < NSETS){
 						for(int i = 0; i < gPowerUps.size(); i++){
@@ -440,17 +424,16 @@ int main(int argc, char *args[]){
 								gDsplyPwrUpsTimer.stop();
 								nextSet = true;
 								set++;
-								printf("success\n");
+								printf("Powerups cleared");
 							}
 						}
 					}
 
 					for(int i = 0; i < gBullets.size(); ++i){
-                        if(gBullets[i].move(gBullets[i].bullet)){
+                        if(gBullets[i].move()){
                             gBullets[i].render();
                         }else{
                             gBullets.erase(gBullets.begin()+i);
-                            printf("bullet erased");
                         }
                     }
 
@@ -459,30 +442,24 @@ int main(int argc, char *args[]){
                             gBomb[i].blowUp(gBomb[i].bombPosX, gBomb[i].bombPosY);
                             gBomb.erase(gBomb.begin()+i);
                         }
-
                         gBomb[i].render();
-
                     }
 
                     for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].render();
 						for(int j = 0; j < gPowerUps.size(); j++){
 							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
-                                //for(int k = 0; k < gBullets.size(); ++k){
-                                    gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID(),gPowerUps[j].powerUpRect);
-                                    gPowerUps.erase(gPowerUps.begin()+j);
-                                //}
+                                gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID(),gPowerUps[j].powerUpRect);
+                                gPowerUps.erase(gPowerUps.begin()+j);
 						    }
 						}
 					}
 				}
-
 				else{
 					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 					SDL_RenderClear(gRenderer);
 					gPauseTextTexture.render(new SDL_Rect{(SCREEN_WIDTH-gPauseTextTexture.getWidth())/2,
-						(SCREEN_LENGTH-gPauseTextTexture.getLength())/2, 0, 0});
-
+						(SCREEN_HEIGHT-gPauseTextTexture.getLength())/2, 0, 0});
 				}
 				SDL_RenderPresent(gRenderer);
 			}
@@ -611,7 +588,6 @@ void LTexture::render(int x, int y, SDL_Rect* clip, double angle, SDL_Point* cen
 	}
 	//Render to screen
 	SDL_RenderCopyEx(gRenderer, mTexture, clip, &renderQuad, angle, center, flip);
-
 }
 
 
@@ -723,13 +699,13 @@ Map::Map(){
 			}
 		}
 	}
-	t = {0, 0, Tile::WIDTH, Tile::LENGTH};
+	t = {0, 0, Tile::WIDTH, Tile::HEIGHT};
 }
 
 Tile* Map::tile(int x, int y){
 	if(x >= 0 && x < Tile::WIDTH*Map::COLS
-		&& y >= 0 && y < Tile::LENGTH*Map::ROWS){
-		return map[x/Tile::WIDTH][y/Tile::LENGTH];
+		&& y >= 0 && y < Tile::HEIGHT*Map::ROWS){
+		return map[x/Tile::WIDTH][y/Tile::HEIGHT];
 	}else{
 		return gTiles[EMPTY];
 	}
@@ -737,7 +713,7 @@ Tile* Map::tile(int x, int y){
 
 void Map::hit(int x, int y){
 	if(tile(x, y) == gTiles[BRICK]){
-		map[x/Tile::WIDTH][y/Tile::LENGTH] = gTiles[GRASS];
+		map[x/Tile::WIDTH][y/Tile::HEIGHT] = gTiles[GRASS];
 	}
 }
 
@@ -745,7 +721,7 @@ void Map::render(){
 	for(int i = 0; i < ROWS; ++i){
 		for(int j = 0; j < COLS; ++j){
 			t.x = j*Tile::WIDTH;
-			t.y = i*Tile::LENGTH;
+			t.y = i*Tile::HEIGHT;
 			gSpriteSheet.render(&t, &(map[j][i]->t));
 		}
 	}
@@ -775,22 +751,18 @@ void Player::move(int vx, int vy){
 
     if((gLevels[gLevel].tile(playerRect.x, playerRect.y))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->m > 0
-		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+LENGTH))->m > 0
-		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+LENGTH))->m > 0
+		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->m > 0
+		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
 		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) ){
         playerRect.x -= vx;
         shiftColliders();
     }
-
-
     playerRect.y += vy;//whatever the position of the rectangle is will also be the position where the rectangel will be rendered
-
     shiftColliders();
-
     if((gLevels[gLevel].tile(playerRect.x, playerRect.y))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->m > 0
-		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+LENGTH))->m > 0
-		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+LENGTH))->m > 0
+		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->m > 0
+		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
 		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) ){
         playerRect.y -= vy;
         shiftColliders();
@@ -801,46 +773,65 @@ Circle& Player::getCollider(){
 }
 
 void Player::shiftColliders(){
-	collider.x = playerRect.x;
-	collider.y = playerRect.y;
+	collider.x = playerRect.x+collider.r;
+	collider.y = playerRect.y+collider.r;
 }
 
 void Player::shoot(){
-
-   //gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH/2), dir);
+   //gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+HEIGHT/2), dir);
     if(dir == EAST){
-        gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+LENGTH/2), dir);
-        printf("BULLET");
+        gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+HEIGHT/2), dir);
 	}
 	else if(dir == WEST){
-        gBullets.emplace_back((playerRect.x-WIDTH), (playerRect.y+LENGTH/2), dir);
-        printf("BULLET");
+        gBullets.emplace_back((playerRect.x-WIDTH/4), (playerRect.y+HEIGHT/2), dir);
 	}
 	else if(dir == SOUTH){
-        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH), dir);
-        printf("BULLET");
+        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+HEIGHT), dir);
 	}
 	else if(dir == NORTH){
-        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-LENGTH), dir);
-        printf("BULLET");
+        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-HEIGHT/4), dir);
 	}
 }
 
 void Player::placeBomb(){
     gBomb.emplace_back(playerRect.x, playerRect.y);
-    //start timer here
     printf("bomb placed");
-
 }
 
 void Player::render(){
     playerTex->render(&playerRect, NULL, 90*dir);
 }
 
+void Player::renderLifeTexture(){
+	for(int i = 0; i < life; i++){
+		gLifeAvailableTexture.render(6*SCREEN_WIDTH/7+WIDTH*i, lifeYPos);
+	}
+}
+
+void Player::activatePowerUp(int id, SDL_Rect& Rect){
+	switch(id){
+		case LIFE:
+			printf("life\n");
+			life++;
+			break;
+		case BOMB:
+            printf("bomb\n");
+            bombEnable = true;
+            break;
+		case SHIELD:
+			printf("shield\n");
+			break;
+		case BULLETUPGRADE:
+			printf("bullet upgraded\n");
+            bulletUpEnable = true;
+			break;
+	}
+}
+
 PowerUp::PowerUp(LTexture* texture, int pwrUp_id){
 	//Gets grass tiles positions for power up positioning
 	for(int i = 0; i < SCREEN_WIDTH; i+=Tile::WIDTH){
-		for(int j = 0; j < PLAYFIELD_LENGTH; j+=Tile::LENGTH){
+		for(int j = 0; j < PLAYFIELD_HEIGHT; j+=Tile::HEIGHT){
 			if(gLevels[gLevel].tile(i,j) == gTiles[GRASS]){
 				x.push_back(i);
 				y.push_back(j);
@@ -849,10 +840,10 @@ PowerUp::PowerUp(LTexture* texture, int pwrUp_id){
 	}
 	//gets a random position to place the powerup
 	int randInd = type()%x.size();
-	powerUpRect = {x[randInd]+Tile::WIDTH/5, y[randInd]+Tile::LENGTH/5, texture->getWidth(), texture->getLength()};
+	powerUpRect = {x[randInd]+Tile::WIDTH/5, y[randInd]+Tile::HEIGHT/5, texture->getWidth(), texture->getLength()};
 	powerUpTex = texture;
 	id = pwrUp_id;
-	collider = {x[randInd]+Tile::WIDTH/5, y[randInd]+Tile::LENGTH/5, WIDTH/2};
+	collider = {x[randInd]+Tile::WIDTH/5, y[randInd]+Tile::HEIGHT/5, WIDTH/2};
 }
 
 void PowerUp::render(){
@@ -867,111 +858,60 @@ Circle& PowerUp::getCollider(){
     return collider;
 }
 
-void Player::renderLifeTexture(){
-
-	for(int i = 0; i < life; i++){
-		gLifeAvailableTexture.render(6*SCREEN_WIDTH/7+WIDTH*i, lifeYPos);
-	}
-}
-
-void Player::activatePowerUp(int id, SDL_Rect& Rect){
-	switch(id){
-		case LIFE:
-
-			printf("life\n");
-			life++;
-			break;
-		case BOMB:
-
-            printf("bomb\n");
-            //turn the area around the bomb to grass
-            bombEnable = true;
-            break;
-		case SHIELD:
-			printf("shield\n");
-			//add to life if hit
-            /*if(checkCollision(gPlayers[0].getCollider())){
-                life++;
-            }
-            if(checkCollision(gPlayers[1].getCollider())){
-                life++;
-            }*/
-			break;
-		case BULLETUPGRADE:
-			printf("bullet upgraded\n");
-            bulletUpEnable = true;
-			break;
-	}
-}
-
-bool Bullet::move(SDL_Rect& rect){
+bool Bullet::move(){
 	x += VEL*cos(PI*(dir+1)/2);
 	y += VEL*sin(PI*(dir+1)/2);
 
-   if(gLevels[gLevel].tile(x, y) == gTiles[BRICK]){
+	SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
+    if(gLevels[gLevel].tile(x, y) == gTiles[BRICK]){
         gLevels[gLevel].hit(x, y);
         return false;
     }
-    else if(gLevels[gLevel].tile(x+WIDTH, y+LENGTH) == gTiles[BRICK]){
-        gLevels[gLevel].hit(x+WIDTH, y+LENGTH);
+    else if(gLevels[gLevel].tile(x+WIDTH, y+HEIGHT) == gTiles[BRICK]){
+        gLevels[gLevel].hit(x+WIDTH, y+HEIGHT);
         return false;
     }
     else if(gLevels[gLevel].tile(x, y) == gTiles[EMPTY]){
         return false;
     }
 
-    if(checkCollision(gPlayers[0].getCollider(),rect)){
-        printf("BULLET collided");
+    else if(checkCollision(gPlayers[0].getCollider(), bullet)){
+        printf("Player 1 hit \n");
         gPlayers[0].life--;
         return false;
     }
-    if(checkCollision(gPlayers[1].getCollider(),rect)){
-        printf("BULLET collided");
+    else if(checkCollision(gPlayers[1].getCollider(), bullet)){
+        printf("Player 2 hit \n");
         gPlayers[1].life--;
         return false;
     }
-	//checks if the bullet of other player has collided with player
-	//fix bullet on player collision
-	/*if(j == 0){          //player1     //bullet of player 2
-        if(checkCollision(gPlayers[1].getCollider(),bullet)){
-            return false;
-        }
-	}
-	else if(j == 1){
-        if(checkCollision(gPlayers[0].getCollider(),bul1)){
-            return false;
-        }
-	}*/
-	/*else if(checkCollision(gPlayers[1].getCollider(),bul1)||checkCollision(gPlayers[0].getCollider(),bul1)){
-		return false;
-	}*/
 	return true;
 }
 
 void Bullet::render(){
-	SDL_Rect bullet{(int) x, (int) y, WIDTH, LENGTH};
+	SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
 	SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 	SDL_RenderFillRect(gRenderer, &bullet);
 }
 
 void Bomb::render(){
     gBombTexture.render(bombPosX+Player::WIDTH-(bombPosX+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2-gBombTexture.getWidth()/2,
-        bombPosY+Player::LENGTH-(bombPosY+Player::LENGTH)%Tile::LENGTH+Tile::LENGTH/2-gBombTexture.getLength()/2);
+        bombPosY+Player::HEIGHT-(bombPosY+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2-gBombTexture.getLength()/2);
 }
 
 void Bomb::blowUp(int x, int y){
     for(int i = 1; i<=1; i++){
         if(gLevels[gLevel].tile((x+Tile::WIDTH*i), y) == gTiles[BRICK]){
-            gLevels[gLevel].map[(x+Tile::WIDTH*i)/Tile::WIDTH][y/Tile::LENGTH]=gTiles[GRASS];//right
+            gLevels[gLevel].map[(x+Tile::WIDTH*i)/Tile::WIDTH][y/Tile::HEIGHT]=gTiles[GRASS];//right
         }
         if(gLevels[gLevel].tile((x-Tile::WIDTH*i), y) == gTiles[BRICK]){
-            gLevels[gLevel].map[(x-Tile::WIDTH*i)/Tile::WIDTH][y/Tile::LENGTH]=gTiles[GRASS];//left
+            gLevels[gLevel].map[(x-Tile::WIDTH*i)/Tile::WIDTH][y/Tile::HEIGHT]=gTiles[GRASS];//left
         }
-        if(gLevels[gLevel].tile((x), (y-Tile::LENGTH*i)) == gTiles[BRICK]){
-            gLevels[gLevel].map[(x)/Tile::WIDTH][(y-Tile::LENGTH*i)/Tile::LENGTH]=gTiles[GRASS];//up
+        if(gLevels[gLevel].tile((x), (y-Tile::HEIGHT*i)) == gTiles[BRICK]){
+            gLevels[gLevel].map[(x)/Tile::WIDTH][(y-Tile::HEIGHT*i)/Tile::HEIGHT]=gTiles[GRASS];//up
         }
-        if(gLevels[gLevel].tile((x), (y+Tile::LENGTH*i)) == gTiles[BRICK]){
-            gLevels[gLevel].map[(x)/Tile::WIDTH][(y+Tile::LENGTH*i)/Tile::LENGTH]=gTiles[GRASS];//down
+        if(gLevels[gLevel].tile((x), (y+Tile::HEIGHT*i)) == gTiles[BRICK]){
+            gLevels[gLevel].map[(x)/Tile::WIDTH][(y+Tile::HEIGHT*i)/Tile::HEIGHT]=gTiles[GRASS];//down
         }
     }
 }
@@ -989,7 +929,7 @@ bool init(){
 			printf("Warning: Linear texture filtering not enabled!");
 		}
 		//Create window
-		gWindow = SDL_CreateWindow("Project", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_LENGTH, SDL_WINDOW_SHOWN);
+		gWindow = SDL_CreateWindow("Project", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 		if(gWindow == NULL){
 			printf("Window could not be created! SDL Error: %s\n", SDL_GetError());
 			success = false;
@@ -1092,13 +1032,6 @@ bool checkCollision(Circle& c1, Circle& c2){
 	return false;
 }
 
-//for player and bullet collision
-/*bool checkCollision(Circle& c1, SDL_Point p){
-    if(sqrt(pow(c1.x-p.x, 2)+pow(c1.y-p.y, 2)) < c1.r){
-		return true;
-	}
-	return false;
-}*/
 bool checkCollision(Circle& c1, SDL_Rect r){
 	//Closest point on collision box
     int cX, cY;
@@ -1111,7 +1044,6 @@ bool checkCollision(Circle& c1, SDL_Rect r){
     else{
         cX = c1.x;
     }
-
     //Find closest y offset
     if(c1.y < r.y){
         cY = r.y;
