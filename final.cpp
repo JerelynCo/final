@@ -149,8 +149,10 @@ class Map{
 class Bullet{
  public:
 	static const int LENGTH = 5, WIDTH = 5, VEL = 5;
+	static const int TIMER = 1;
 	double x, y, w, h;
 	int dir;
+
 
 	Bullet(double xStart, double yStart, int direction):
 		x(xStart), y(yStart), w(WIDTH), h(LENGTH), dir(direction){};
@@ -756,7 +758,6 @@ void Player::act(SDL_Scancode key){
 	}
 	if(key == con[PLACEBOMB]&&bombEnable == true){
         placeBomb();
-
 	}
 }
 
@@ -818,7 +819,7 @@ void Player::shoot(){
         gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+LENGTH/2), EAST);
         gBullets.emplace_back((playerRect.x-WIDTH), (playerRect.y+LENGTH/2), WEST);
         gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH), SOUTH);
-         gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-LENGTH), NORTH);
+        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-LENGTH), NORTH);
     }
 }
 
@@ -897,10 +898,11 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
 }
 
 bool Bullet::move(SDL_Rect& rect){
-	x += VEL*cos(PI*(dir+1)/2);
-	y += VEL*sin(PI*(dir+1)/2);
 
-   if(gLevels[gLevel].tile(x, y) == gTiles[BRICK]){
+    x += VEL*cos(PI*(dir+1)/2);
+    y += VEL*sin(PI*(dir+1)/2);
+
+    if(gLevels[gLevel].tile(x, y) == gTiles[BRICK]){
         gLevels[gLevel].hit(x, y);
         return false;
     }
@@ -912,7 +914,7 @@ bool Bullet::move(SDL_Rect& rect){
         return false;
     }
 
-    if(checkCollision(gPlayers[0].getCollider(),rect)){
+    /*if(checkCollision(gPlayers[0].getCollider(),rect)){
         printf("BULLET collided");
         gPlayers[0].life--;
         return false;
@@ -921,7 +923,8 @@ bool Bullet::move(SDL_Rect& rect){
         printf("BULLET collided");
         gPlayers[1].life--;
         return false;
-    }
+    }*/
+
 	//checks if the bullet of other player has collided with player
 	//fix bullet on player collision
 	/*if(j == 0){          //player1     //bullet of player 2
