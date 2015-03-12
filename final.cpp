@@ -154,6 +154,7 @@ class Bullet{
 
 		bool move();
 		void render();
+		bool blanks();
 		SDL_Rect bullet;
 };
 
@@ -173,10 +174,11 @@ class Player{
 		int life = 3;
 		static const int WIDTH = 20, HEIGHT = 20;
 		static const int VEL = 2;
+        bool shieldEnable;
 
-		Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enableBombUp, bool enableBulletUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
+		Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
-			dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2},bombEnable(enableBombUp), bulletUpEnable(enableBulletUp) ,lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
+			dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2},bombEnable(enableBombUp), bulletUpEnable(enableBulletUp) , shieldEnable(enableShieldUp),lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
 
 		void act(const Uint8*);
 		void act(SDL_Scancode);
@@ -303,15 +305,15 @@ int main(int argc, char *args[]){
 			bool quit = false;
 
 			//initial player values
-			bool enableBombUp, enableBulletUp = false;
+			bool enableBombUp, enableBulletUp, enableShieldUp = true;
 			int p1LifeAvailablePosY = 15;
 			int p2LifeAvailablePosY= 37;
 			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
 
 			//Create players
 
-			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosY, p1_posX, p1_posY, enableBombUp, enableBulletUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
-			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosY, p2_posX, p2_posY, enableBombUp, enableBulletUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
+			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosY, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
+			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosY, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp,SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
 
 
 			//Power ups variables
@@ -434,7 +436,7 @@ int main(int argc, char *args[]){
 					}
 
 					for(int i = 0; i < gBullets.size(); ++i){
-                        if(gBullets[i].move()){
+                        if(gBullets[i].move()||gBullets[i].blanks()){
                             gBullets[i].render();
                         }else{
                             gBullets.erase(gBullets.begin()+i);
@@ -813,6 +815,20 @@ void Player::placeBomb(){
     printf("bomb placed");
 }
 
+bool Bullet::blanks(){
+    SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
+    if(checkCollision(gPlayers[0].getCollider(), bullet)&&gPlayers[0].shieldEnable == true){
+        printf("Player 1 shielded \n");
+        gPlayers[0].life++;
+        return false;
+    }
+    if(checkCollision(gPlayers[1].getCollider(), bullet)&&gPlayers[1].shieldEnable == true){
+        printf("Player 2 shielded \n");
+        gPlayers[1].life++;
+        return false;
+    }
+}
+
 void Player::render(){
     playerTex->render(&playerRect, NULL, 90*dir);
 }
@@ -835,14 +851,7 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
             break;
 		case SHIELD:
 			printf("shield\n");
-			printf("shield\n");
-			//add to life if hit
-            /*if(checkCollision(gPlayers[0].getCollider())){
-                life++;
-            }
-            if(checkCollision(gPlayers[1].getCollider())){
-                life++;
-            }*/
+			shieldEnable = true;
 			break;
 		case BULLETUPGRADE:
 			printf("bullet upgraded\n");
