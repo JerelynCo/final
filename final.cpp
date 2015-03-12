@@ -142,9 +142,11 @@ class Map{
 };
 
 class Bullet{
+
 	public:
 		static const int HEIGHT = 5, WIDTH = 5, VEL = 5;
 		double x, y, w, h;
+
 		int dir;
 
 		Bullet(double xStart, double yStart, int direction):
@@ -152,11 +154,11 @@ class Bullet{
 
 		bool move();
 		void render();
+		bool blanks();
 		SDL_Rect bullet;
 };
 
-class Player{	
-	
+class Player{
     bool bulletUpEnable;
     bool bombEnable;
     int dir;
@@ -167,14 +169,18 @@ class Player{
 	Circle collider;
 	SDL_Scancode con[6];
 
+
 	public:
 		int life = 3;
 		static const int WIDTH = 20, HEIGHT = 20;
 		static const int VEL = 2;
+		static const int SHIELD_DURATION = 10;
+        bool shieldEnable;
+        LTimer shieldTimer;
 
-		Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enableBombUp, bool enableBulletUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
+		Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
-			dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2},bombEnable(enableBombUp), bulletUpEnable(enableBulletUp) ,lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
+			dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2},bombEnable(enableBombUp), bulletUpEnable(enableBulletUp) , shieldEnable(enableShieldUp),lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
 
 		void act(const Uint8*);
 		void act(SDL_Scancode);
@@ -218,8 +224,9 @@ class Bomb{
         //Tile& tile(int x, int y);
         Bomb(int x, int y):
             bombPosX(x), bombPosY(y) {timer.start();};
-        
+
         void render();
+        void renderExplosion();
         void blowUp(int x, int y);
 
 };
@@ -250,7 +257,6 @@ TTF_Font* gFont = NULL;
 LTexture gPlayerOneTexture;
 LTexture gPlayerTwoTexture;
 
-
 LTexture gBombPowerUPTexture;
 LTexture gShieldTexture;
 LTexture gLifeTexture;
@@ -261,8 +267,8 @@ LTexture gPauseTextTexture;
 
 LTexture gLifeAvailableTexture;
 
-
 LTexture gBombTexture;
+LTexture gExplosionTexture;
 std::vector<Map> gLevels;
 int gLevel = 0;
 
@@ -301,14 +307,18 @@ int main(int argc, char *args[]){
 			bool quit = false;
 
 			//initial player values
-			bool enableBombUp, enableBulletUp = false;
+			bool enableBombUp = false;
+			bool enableBulletUp = false;
+			bool enableShieldUp = false;
 			int p1LifeAvailablePosY = 15;
 			int p2LifeAvailablePosY= 37;
 			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
 
 			//Create players
-			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosY, p1_posX, p1_posY, enableBombUp, enableBulletUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
-			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosY, p2_posX, p2_posY, enableBombUp, enableBulletUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
+
+			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosY, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
+			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosY, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp,SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
+
 
 			//Power ups variables
 			static const int NSETS = 4;
@@ -371,7 +381,7 @@ int main(int argc, char *args[]){
 					gPlayers[i].act(state);
 				}
 
-				//Loads new set of powerups when nextSet flag is set to true (time dependent) 
+				//Loads new set of powerups when nextSet flag is set to true (time dependent)
 				if(nextSet && set < NSETS){
 					for(int i = 0; i < NPOWERUPS; i++){
 						for(int j = 0; j < powerUpsSet[set][i]; j++){
@@ -430,7 +440,7 @@ int main(int argc, char *args[]){
 					}
 
 					for(int i = 0; i < gBullets.size(); ++i){
-                        if(gBullets[i].move()){
+                        if(gBullets[i].move()||gBullets[i].blanks()){
                             gBullets[i].render();
                         }else{
                             gBullets.erase(gBullets.begin()+i);
@@ -440,6 +450,7 @@ int main(int argc, char *args[]){
                     for(int i = 0; i<gBomb.size(); i++){
                         if(gBomb[i].timer.getTicks()/1000>Bomb::TIMER){
                             gBomb[i].blowUp(gBomb[i].bombPosX, gBomb[i].bombPosY);
+                            gBomb[i].renderExplosion();
                             gBomb.erase(gBomb.begin()+i);
                         }
                         gBomb[i].render();
@@ -447,6 +458,11 @@ int main(int argc, char *args[]){
 
                     for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].render();
+
+						if(gPlayers[i].shieldEnable == true && gPlayers[i].shieldTimer.getTicks()/1000>Player::SHIELD_DURATION){
+                            gPlayers[i].shieldEnable = false;
+                            printf("stop shield");
+                        }
 						for(int j = 0; j < gPowerUps.size(); j++){
 							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
                                 gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID(),gPowerUps[j].powerUpRect);
@@ -454,6 +470,18 @@ int main(int argc, char *args[]){
 						    }
 						}
 					}
+                    if(gPlayers[0].shieldEnable == true){
+                        gPlayerOneTexture.loadFromFile("Assets/p1_shield.png");
+                    }
+                    else{
+                        gPlayerOneTexture.loadFromFile("Assets/p1.png");
+                    }
+                    if(gPlayers[1].shieldEnable == true){
+                        gPlayerTwoTexture.loadFromFile("Assets/p2_shield.png");
+                    }
+                    else{
+                        gPlayerTwoTexture.loadFromFile("Assets/p2.png");
+                    }
 				}
 				else{
 					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
@@ -735,13 +763,11 @@ void Player::act(const Uint8* state){
 }
 
 void Player::act(SDL_Scancode key){
-
 	if(key == con[SHOOT]){
         shoot();
 	}
 	if(key == con[PLACEBOMB]&&bombEnable == true){
         placeBomb();
-
 	}
 }
 
@@ -778,19 +804,31 @@ void Player::shiftColliders(){
 }
 
 void Player::shoot(){
-   //gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+HEIGHT/2), dir);
-    if(dir == EAST){
-        gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+HEIGHT/2), dir);
-	}
-	else if(dir == WEST){
-        gBullets.emplace_back((playerRect.x-WIDTH/4), (playerRect.y+HEIGHT/2), dir);
-	}
-	else if(dir == SOUTH){
-        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+HEIGHT), dir);
-	}
-	else if(dir == NORTH){
-        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-HEIGHT/4), dir);
-	}
+   //gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH/2), dir);
+   if(bulletUpEnable == false){
+        if(dir == EAST){
+            gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+HEIGHT/2), dir);
+            printf("BULLET");
+        }
+        else if(dir == WEST){
+            gBullets.emplace_back((playerRect.x-WIDTH), (playerRect.y+HEIGHT/2), dir);
+            printf("BULLET");
+        }
+        else if(dir == SOUTH){
+            gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+HEIGHT), dir);
+            printf("BULLET");
+        }
+        else if(dir == NORTH){
+            gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-HEIGHT), dir);
+            printf("BULLET");
+        }
+    }
+    else if(bulletUpEnable == true){
+        gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+HEIGHT/2), EAST);
+        gBullets.emplace_back((playerRect.x-WIDTH), (playerRect.y+HEIGHT/2), WEST);
+        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+HEIGHT), SOUTH);
+        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-HEIGHT), NORTH);
+    }
 }
 
 void Player::placeBomb(){
@@ -798,8 +836,22 @@ void Player::placeBomb(){
     printf("bomb placed");
 }
 
+bool Bullet::blanks(){
+    SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
+    if(checkCollision(gPlayers[0].getCollider(), bullet)&&gPlayers[0].shieldEnable == true){
+        printf("Player 1 shielded \n");
+        gPlayers[0].life++;
+        return false;
+    }
+    if(checkCollision(gPlayers[1].getCollider(), bullet)&&gPlayers[1].shieldEnable == true){
+        printf("Player 2 shielded \n");
+        gPlayers[1].life++;
+        return false;
+    }
+}
+
 void Player::render(){
-    playerTex->render(&playerRect, NULL, 90*dir);
+     playerTex->render(&playerRect, NULL, 90*dir);
 }
 
 void Player::renderLifeTexture(){
@@ -820,6 +872,8 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
             break;
 		case SHIELD:
 			printf("shield\n");
+			shieldTimer.start();
+			shieldEnable = true;
 			break;
 		case BULLETUPGRADE:
 			printf("bullet upgraded\n");
@@ -858,11 +912,13 @@ Circle& PowerUp::getCollider(){
     return collider;
 }
 
+
 bool Bullet::move(){
 	x += VEL*cos(PI*(dir+1)/2);
 	y += VEL*sin(PI*(dir+1)/2);
 
 	SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
+
     if(gLevels[gLevel].tile(x, y) == gTiles[BRICK]){
         gLevels[gLevel].hit(x, y);
         return false;
@@ -884,6 +940,7 @@ bool Bullet::move(){
         printf("Player 2 hit \n");
         gPlayers[1].life--;
         return false;
+
     }
 	return true;
 }
@@ -897,6 +954,11 @@ void Bullet::render(){
 void Bomb::render(){
     gBombTexture.render(bombPosX+Player::WIDTH-(bombPosX+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2-gBombTexture.getWidth()/2,
         bombPosY+Player::HEIGHT-(bombPosY+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2-gBombTexture.getLength()/2);
+}
+
+void Bomb::renderExplosion(){
+    gExplosionTexture.render(bombPosX+Player::WIDTH-(bombPosX+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2-gExplosionTexture.getWidth()/2,
+        bombPosY+Player::HEIGHT-(bombPosY+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2-gExplosionTexture.getLength()/2);
 }
 
 void Bomb::blowUp(int x, int y){
@@ -984,7 +1046,6 @@ bool loadMedia(){
 		gTiles[WATER] = new Tile({64, 0, 32, 32}, 1);
 		gTiles[EMPTY] = new Tile({96, 0, 32, 32}, 3);
 	}
-
 	//Load player textures
 	if(!gPlayerOneTexture.loadFromFile("Assets/p1.png")){
 		printf("Failed to load player 1 texture!\n");
@@ -994,13 +1055,16 @@ bool loadMedia(){
 		printf("Failed to load player 2 texture!\n");
 		success = false;
 	}
-
-	//Load power up textures
+    //Load power up textures
 	if(!gBombPowerUPTexture.loadFromFile("Assets/bomb.png")){
 		printf("Failed to load bomb texture!\n");
 		success = false;
 	}
-	if(!gBombTexture.loadFromFile("Assets/bomb.png")){
+	if(!gBombTexture.loadFromFile("Assets/bomb.gif")){
+		printf("Failed to load bomb texture!\n");
+		success = false;
+	}
+	if(!gExplosionTexture.loadFromFile("Assets/explosion.png")){
 		printf("Failed to load bomb texture!\n");
 		success = false;
 	}
@@ -1016,7 +1080,6 @@ bool loadMedia(){
 		printf("Failed to load bulletUpgrade texture!\n");
 		success = false;
 	}
-
 	//Load players' life available image
 	if(!gLifeAvailableTexture.loadFromFile("Assets/lifeAvailable.png")){
 		printf("Failed to load life available texture!\n");
