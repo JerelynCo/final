@@ -226,6 +226,7 @@ class Bomb{
             bombPosX(x), bombPosY(y) {timer.start();};
 
         void render();
+        void renderExplosion();
         void blowUp(int x, int y);
 
 };
@@ -267,8 +268,8 @@ LTexture gPauseTextTexture;
 
 LTexture gLifeAvailableTexture;
 
-
 LTexture gBombTexture;
+LTexture gExplosionTexture;
 std::vector<Map> gLevels;
 int gLevel = 0;
 
@@ -307,7 +308,7 @@ int main(int argc, char *args[]){
 			bool quit = false;
 
 			//initial player values
-			bool enableBombUp = false;
+			bool enableBombUp = true;
 			bool enableBulletUp = false;
 			bool enableShieldUp = false;
 			int p1LifeAvailablePosY = 15;
@@ -438,14 +439,6 @@ int main(int argc, char *args[]){
 							}
 						}
 					}
-                    //stops the shield after 10 seconds
-                    for(int i = 0; i<gPlayers.size(); i++){
-                        if(gPlayers[i].shieldEnable == true && gPlayers[i].shieldTimer.getTicks()/1000>Player::SHIELD_DURATION){
-                            //set to false after 10s
-                            gPlayers[i].shieldEnable = false;
-                            printf("stop shield");
-                        }
-                    }
 
 					for(int i = 0; i < gBullets.size(); ++i){
                         if(gBullets[i].move()||gBullets[i].blanks()){
@@ -458,6 +451,7 @@ int main(int argc, char *args[]){
                     for(int i = 0; i<gBomb.size(); i++){
                         if(gBomb[i].timer.getTicks()/1000>Bomb::TIMER){
                             gBomb[i].blowUp(gBomb[i].bombPosX, gBomb[i].bombPosY);
+                            gBomb[i].renderExplosion();
                             gBomb.erase(gBomb.begin()+i);
                         }
                         gBomb[i].render();
@@ -465,6 +459,10 @@ int main(int argc, char *args[]){
 
                     for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].render();
+						if(gPlayers[i].shieldEnable == true && gPlayers[i].shieldTimer.getTicks()/1000>Player::SHIELD_DURATION){
+                            gPlayers[i].shieldEnable = false;
+                            printf("stop shield");
+                        }
 						for(int j = 0; j < gPowerUps.size(); j++){
 							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
                                 gPlayers[i].activatePowerUp(gPowerUps[j].getPowerUpID(),gPowerUps[j].powerUpRect);
@@ -933,13 +931,8 @@ bool Bullet::move(){
         return false;
 
     }
-
 	return true;
-
 }
-
-
-
 
 void Bullet::render(){
 	SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
@@ -950,6 +943,11 @@ void Bullet::render(){
 void Bomb::render(){
     gBombTexture.render(bombPosX+Player::WIDTH-(bombPosX+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2-gBombTexture.getWidth()/2,
         bombPosY+Player::HEIGHT-(bombPosY+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2-gBombTexture.getLength()/2);
+}
+
+void Bomb::renderExplosion(){
+    gExplosionTexture.render(bombPosX+Player::WIDTH-(bombPosX+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2-gExplosionTexture.getWidth()/2,
+        bombPosY+Player::HEIGHT-(bombPosY+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2-gExplosionTexture.getLength()/2);
 }
 
 void Bomb::blowUp(int x, int y){
@@ -1047,13 +1045,16 @@ bool loadMedia(){
 		printf("Failed to load player 2 texture!\n");
 		success = false;
 	}
-
 	//Load power up textures
 	if(!gBombPowerUPTexture.loadFromFile("Assets/bomb.png")){
 		printf("Failed to load bomb texture!\n");
 		success = false;
 	}
-	if(!gBombTexture.loadFromFile("Assets/bomb.png")){
+	if(!gBombTexture.loadFromFile("Assets/bomb.gif")){
+		printf("Failed to load bomb texture!\n");
+		success = false;
+	}
+	if(!gExplosionTexture.loadFromFile("Assets/explosion.png")){
 		printf("Failed to load bomb texture!\n");
 		success = false;
 	}
@@ -1069,7 +1070,6 @@ bool loadMedia(){
 		printf("Failed to load bulletUpgrade texture!\n");
 		success = false;
 	}
-
 	//Load players' life available image
 	if(!gLifeAvailableTexture.loadFromFile("Assets/lifeAvailable.png")){
 		printf("Failed to load life available texture!\n");
