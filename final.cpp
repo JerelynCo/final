@@ -310,8 +310,8 @@ int main(int argc, char *args[]){
 			bool quit = false;
 
 			//Create players
-			gPlayers.emplace_back(&gPlayerOneTexture, 15, 5, 5,true,false, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
-			gPlayers.emplace_back(&gPlayerTwoTexture, 37, SCREEN_WIDTH-Player::WIDTH-5, PLAYFIELD_LENGTH-Player::LENGTH-5,false,false, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
+			gPlayers.emplace_back(&gPlayerOneTexture, 15, 5, 5,false,false, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
+			gPlayers.emplace_back(&gPlayerTwoTexture, 37, SCREEN_WIDTH-Player::WIDTH-5, PLAYFIELD_LENGTH-Player::LENGTH-5,false,true, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
 
 			//Power ups variables
 			static const int NSETS = 4;
@@ -796,22 +796,30 @@ void Player::shiftColliders(){
 
 void Player::shoot(){
    //gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH/2), dir);
-    if(dir == EAST){
-        gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+LENGTH/2), dir);
-        printf("BULLET");
-	}
-	else if(dir == WEST){
-        gBullets.emplace_back((playerRect.x-WIDTH), (playerRect.y+LENGTH/2), dir);
-        printf("BULLET");
-	}
-	else if(dir == SOUTH){
-        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH), dir);
-        printf("BULLET");
-	}
-	else if(dir == NORTH){
-        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-LENGTH), dir);
-        printf("BULLET");
-	}
+   if(bulletUpEnable == false){
+        if(dir == EAST){
+            gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+LENGTH/2), dir);
+            printf("BULLET");
+        }
+        else if(dir == WEST){
+            gBullets.emplace_back((playerRect.x-WIDTH), (playerRect.y+LENGTH/2), dir);
+            printf("BULLET");
+        }
+        else if(dir == SOUTH){
+            gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH), dir);
+            printf("BULLET");
+        }
+        else if(dir == NORTH){
+            gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-LENGTH), dir);
+            printf("BULLET");
+        }
+    }
+    else if(bulletUpEnable == true){
+        gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+LENGTH/2), EAST);
+        gBullets.emplace_back((playerRect.x-WIDTH), (playerRect.y+LENGTH/2), WEST);
+        gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH), SOUTH);
+         gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-LENGTH), NORTH);
+    }
 }
 
 void Player::placeBomb(){
