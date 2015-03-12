@@ -159,7 +159,6 @@ class Bullet{
 };
 
 class Player{
-
     bool bulletUpEnable;
     bool bombEnable;
     int dir;
@@ -170,11 +169,14 @@ class Player{
 	Circle collider;
 	SDL_Scancode con[6];
 
+
 	public:
 		int life = 3;
 		static const int WIDTH = 20, HEIGHT = 20;
 		static const int VEL = 2;
+		static const int SHIELD_DURATION = 10;
         bool shieldEnable;
+        LTimer shieldTimer;
 
 		Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
@@ -305,7 +307,9 @@ int main(int argc, char *args[]){
 			bool quit = false;
 
 			//initial player values
-			bool enableBombUp, enableBulletUp, enableShieldUp = true;
+			bool enableBombUp = false;
+			bool enableBulletUp = false;
+			bool enableShieldUp = false;
 			int p1LifeAvailablePosY = 15;
 			int p2LifeAvailablePosY= 37;
 			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
@@ -434,6 +438,14 @@ int main(int argc, char *args[]){
 							}
 						}
 					}
+                    //stops the shield after 10 seconds
+                    for(int i = 0; i<gPlayers.size(); i++){
+                        if(gPlayers[i].shieldEnable == true && gPlayers[i].shieldTimer.getTicks()/1000>Player::SHIELD_DURATION){
+                            //set to false after 10s
+                            gPlayers[i].shieldEnable = false;
+                            printf("stop shield");
+                        }
+                    }
 
 					for(int i = 0; i < gBullets.size(); ++i){
                         if(gBullets[i].move()||gBullets[i].blanks()){
@@ -851,6 +863,7 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
             break;
 		case SHIELD:
 			printf("shield\n");
+			shieldTimer.start();
 			shieldEnable = true;
 			break;
 		case BULLETUPGRADE:
