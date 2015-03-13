@@ -159,7 +159,7 @@ class Bullet{
 class Player{
     
     int dir;
-	int lifeYPos;
+	int lifeXPos;
 	LTexture* playerTex;
 	LTexture* playerLifeTex;
 	Circle collider;
@@ -181,9 +181,9 @@ class Player{
 
         bool collidedBomb;
 
-		Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
+		Player(LTexture* texture, int lifeAvailableXPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
-			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb}, collidedBomb(false) {};
+			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb}, collidedBomb(false) {};
 
 		void act(const Uint8*);
 		void act(SDL_Scancode);
@@ -269,6 +269,7 @@ LTexture gBulletUpgradeTexture;
 
 LTexture gTimeTextTexture;
 LTexture gPauseTextTexture;
+LTexture gMainTexture;
 
 LTexture gLifeAvailableTexture;
 
@@ -296,10 +297,6 @@ Tile* gTiles[4];
 
 
 int main(int argc, char *args[]){
-	gTimer.start();
-	if(gTimer.isStarted()){
-		printf("Timer Started\n");
-	}
 	//Start up SDL and create window
 	if(!init()){
 		printf("Failed to initialize!\n");
@@ -310,19 +307,21 @@ int main(int argc, char *args[]){
 		}else{
 			//Main loop flag
 			bool quit = false;
+			bool start = false;
+			bool paused = false;
 
 			//initial player values
 			bool enableBombUp = false;
 			bool enableBulletUp = false;
 			bool enableShieldUp = false;
-			int p1LifeAvailablePosY = 15;
-			int p2LifeAvailablePosY= 37;
+			int p1LifeAvailablePosX = 60;
+			int p2LifeAvailablePosX= SCREEN_WIDTH-SCREEN_WIDTH/6;
 			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
 
 			//Create players
 
-			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosY, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
-			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosY, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
+			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_V, SDL_SCANCODE_C);
+			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosX, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
 
 
 			//Power ups variables
@@ -355,9 +354,6 @@ int main(int argc, char *args[]){
 				gLevels.emplace_back();
 			}
 
-			//start global game timer
-			gTimer.start();
-
 			//While application is running
 			while(!quit){
 				while(SDL_PollEvent(&event)){
@@ -367,11 +363,17 @@ int main(int argc, char *args[]){
 					}
 					//Pause/Unpause
 					if(event.type == SDL_KEYDOWN){
+						if(event.key.keysym.sym == SDLK_RETURN){
+							gTimer.start();
+							start = true;
+						}
 						if(event.key.keysym.sym == SDLK_p){
 							if(gTimer.isPaused()){
 								gTimer.unpause();
+								paused = false;
 							}else{
 								gTimer.pause();
+								paused = true;
 							}
 
 						}else if(event.key.repeat == 0){
@@ -395,8 +397,12 @@ int main(int argc, char *args[]){
 					}
 					nextSet = false;
 				}
+				if(!start){
+					SDL_RenderClear(gRenderer);
+					gMainTexture.render(0,0);
+				}
 
-				if(gTimer.isStarted() && !gTimer.isPaused()){
+				else if(!gTimer.isPaused()){
 
 					//Viewports
 					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
@@ -418,8 +424,8 @@ int main(int argc, char *args[]){
 					}
 
 					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth())/2, (SCOREBOARD_HEIGHT-gTimeTextTexture.getLength())/2);
-					gPlayerOneTexture.render(6*SCREEN_WIDTH/7-2*Player::WIDTH, 15);
-					gPlayerTwoTexture.render(6*SCREEN_WIDTH/7-2*Player::WIDTH, 37);
+					gPlayerOneTexture.render(30, 15);
+					gPlayerTwoTexture.render(SCREEN_WIDTH-SCREEN_WIDTH/6-30, 15);
 
 					for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].renderLifeTexture();
@@ -496,7 +502,7 @@ int main(int argc, char *args[]){
                         gPlayerTwoTexture.loadFromFile("Assets/p2.png");
                     }
 				}
-				else{
+				else if(paused){
 					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 					SDL_RenderClear(gRenderer);
 					gPauseTextTexture.render(new SDL_Rect{(SCREEN_WIDTH-gPauseTextTexture.getWidth())/2,
@@ -860,7 +866,7 @@ void Player::render(){
 
 void Player::renderLifeTexture(){
 	for(int i = 0; i < life; i++){
-		gLifeAvailableTexture.render(6*SCREEN_WIDTH/7+WIDTH*i, lifeYPos);
+		gLifeAvailableTexture.render(lifeXPos+(gLifeAvailableTexture.getWidth()*i), 15);
 	}
 }
 
@@ -1042,6 +1048,12 @@ bool init(){
 bool loadMedia(){
 	//Loading success flag
 	bool success = true;
+
+	if(!gMainTexture.loadFromFile("Assets/main.png") ){
+		printf( "Unable to render main text texture!\n" );
+		success = false;
+	}
+
 	//load font
 	gFont = TTF_OpenFont("Assets/ostrich.ttf", 50);
 	SDL_Color textColor = {0xD0, 0xD0, 0xD0, 0xFF};
@@ -1145,6 +1157,7 @@ bool checkCollision(Circle& c1, SDL_Rect r){
 void close(){
 	//Free loaded images
 	gPauseTextTexture.free();
+	gMainTexture.free();
 	gTimeTextTexture.free();
 	gLifeAvailableTexture.free();
 
