@@ -126,8 +126,7 @@ class Tile{
 
 
 class Map{
-
-		SDL_Rect t;
+	SDL_Rect t;
  	public:
 		static const int ROWS = PLAYFIELD_HEIGHT/Tile::HEIGHT, COLS = SCREEN_WIDTH/Tile::WIDTH;
 
@@ -142,7 +141,6 @@ class Map{
 };
 
 class Bullet{
-
 	public:
 		static const int HEIGHT = 5, WIDTH = 5, VEL = 5;
 		double x, y, w, h;
@@ -159,28 +157,33 @@ class Bullet{
 };
 
 class Player{
-    bool bulletUpEnable;
-    bool bombEnable;
+    
     int dir;
 	int lifeYPos;
-	SDL_Rect playerRect;
 	LTexture* playerTex;
 	LTexture* playerLifeTex;
 	Circle collider;
 	SDL_Scancode con[6];
 
-
 	public:
 		int life = 3;
+		SDL_Rect playerRect;
 		static const int WIDTH = 20, HEIGHT = 20;
 		static const int VEL = 2;
 		static const int SHIELD_DURATION = 10;
+		static const int BOMB_DURATION = 50;
+
         bool shieldEnable;
+        bool bulletUpEnable;
+    	bool bombEnable;
         LTimer shieldTimer;
+        LTimer bombTimer;
+
+        bool collidedBomb;
 
 		Player(LTexture* texture, int lifeAvailableYPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
-			dir(SOUTH), playerTex(texture), collider{x,y,WIDTH/2},bombEnable(enableBombUp), bulletUpEnable(enableBulletUp) , shieldEnable(enableShieldUp),lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb} {};
+			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeYPos(lifeAvailableYPos), con{up, left, down, right, shoot, placebomb}, collidedBomb(false) {};
 
 		void act(const Uint8*);
 		void act(SDL_Scancode);
@@ -213,18 +216,19 @@ class PowerUp{
 };
 
 class Bomb{
-
+	Circle collider;
     public:
         static const int WIDTH = 20, HEIGHT = 20;
         static const int TIMER = 5;
 
         int bombPosX, bombPosY;
         LTimer timer;
+        int scope;
 
-        //Tile& tile(int x, int y);
         Bomb(int x, int y):
-            bombPosX(x), bombPosY(y) {timer.start();};
-
+            bombPosX(x), bombPosY(y), collider{x+Player::WIDTH-(x+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2, y+Player::HEIGHT-(y+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2, WIDTH/2}, scope(1) {timer.start();};
+        Circle& getCollider();
+		void shiftColliders();
         void render();
         void renderExplosion();
         void blowUp(int x, int y);
@@ -240,6 +244,7 @@ bool loadMedia();
 //Checks collision between c1 and c2
 bool checkCollision(Circle& c1, Circle& c2);
 bool checkCollision(Circle& c1, SDL_Rect r);
+bool checkBombCollide(Circle& player);
 
 //Frees media and shuts down SDL
 void close();
@@ -316,8 +321,8 @@ int main(int argc, char *args[]){
 
 			//Create players
 
-			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosY, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_Z);
-			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosY, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp,SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
+			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosY, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
+			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosY, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
 
 
 			//Power ups variables
@@ -326,7 +331,7 @@ int main(int argc, char *args[]){
 			static const int DSPLYTIMEPWRUP = 8;
 
             //LIFE, BOMB, SHIELD, BULLETUPGRADE
-			static const int powerUpsSet[NSETS][NPOWERUPS] = {{0, 0, 3, 2}, {0, 2, 0, 0}, {3, 0, 1, 0}, {0, 0, 2, 0}};
+			static const int powerUpsSet[NSETS][NPOWERUPS] = {{0, 4, 2, 2}, {0, 2, 0, 0}, {3, 0, 1, 0}, {0, 0, 2, 0}};
 			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombPowerUPTexture, gShieldTexture, gBulletUpgradeTexture};
 
 			int set = 0;
@@ -434,7 +439,7 @@ int main(int argc, char *args[]){
 								gDsplyPwrUpsTimer.stop();
 								nextSet = true;
 								set++;
-								printf("Powerups cleared");
+								printf("Powerups cleared\n");
 							}
 						}
 					}
@@ -448,20 +453,25 @@ int main(int argc, char *args[]){
                     }
 
                     for(int i = 0; i<gBomb.size(); i++){
-                        if(gBomb[i].timer.getTicks()/1000>Bomb::TIMER){
+                        if(gBomb[i].timer.getTicks()/1000 > Bomb::TIMER){
                             gBomb[i].blowUp(gBomb[i].bombPosX, gBomb[i].bombPosY);
                             gBomb[i].renderExplosion();
                             gBomb.erase(gBomb.begin()+i);
                         }
-                        gBomb[i].render();
+                        else{
+                        	gBomb[i].render();
+                        }                      
                     }
 
                     for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].render();
-
 						if(gPlayers[i].shieldEnable == true && gPlayers[i].shieldTimer.getTicks()/1000>Player::SHIELD_DURATION){
                             gPlayers[i].shieldEnable = false;
-                            printf("stop shield");
+                            gPlayers[i].shieldTimer.stop();
+                        }
+                        if(gPlayers[i].bombEnable == true && gPlayers[i].bombTimer.getTicks()/1000>Player::BOMB_DURATION){
+                            gPlayers[i].bombEnable = false;
+                            gPlayers[i].bombTimer.stop();
                         }
 						for(int j = 0; j < gPowerUps.size(); j++){
 							if(checkCollision(gPlayers[i].getCollider(), gPowerUps[j].getCollider())){
@@ -470,15 +480,18 @@ int main(int argc, char *args[]){
 						    }
 						}
 					}
+
                     if(gPlayers[0].shieldEnable == true){
                         gPlayerOneTexture.loadFromFile("Assets/p1_shield.png");
                     }
                     else{
                         gPlayerOneTexture.loadFromFile("Assets/p1.png");
                     }
+
                     if(gPlayers[1].shieldEnable == true){
                         gPlayerTwoTexture.loadFromFile("Assets/p2_shield.png");
                     }
+
                     else{
                         gPlayerTwoTexture.loadFromFile("Assets/p2.png");
                     }
@@ -779,20 +792,26 @@ void Player::move(int vx, int vy){
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
-		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) ){
-        playerRect.x -= vx;
-        shiftColliders();
-    }
+		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
+		|| (checkBombCollide(collider))
+		){
+	        playerRect.x -= vx;
+	        shiftColliders();
+    	}
     playerRect.y += vy;//whatever the position of the rectangle is will also be the position where the rectangel will be rendered
     shiftColliders();
+
     if((gLevels[gLevel].tile(playerRect.x, playerRect.y))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
-		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) ){
-        playerRect.y -= vy;
-        shiftColliders();
-    }
+		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
+		|| (checkBombCollide(collider))
+		){
+	        playerRect.y -= vy;
+	        shiftColliders();
+    	}
+    collidedBomb = false;
 }
 Circle& Player::getCollider(){
 	return collider;
@@ -806,22 +825,10 @@ void Player::shiftColliders(){
 void Player::shoot(){
    //gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH/2), dir);
    if(bulletUpEnable == false){
-        if(dir == EAST){
-            gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+HEIGHT/2), dir);
-            printf("BULLET");
-        }
-        else if(dir == WEST){
-            gBullets.emplace_back((playerRect.x-WIDTH), (playerRect.y+HEIGHT/2), dir);
-            printf("BULLET");
-        }
-        else if(dir == SOUTH){
-            gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+HEIGHT), dir);
-            printf("BULLET");
-        }
-        else if(dir == NORTH){
-            gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-HEIGHT), dir);
-            printf("BULLET");
-        }
+        if(dir == EAST) gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+HEIGHT/2), dir);
+        else if(dir == WEST) gBullets.emplace_back((playerRect.x-WIDTH/4), (playerRect.y+HEIGHT/2), dir);
+        else if(dir == SOUTH) gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+HEIGHT), dir);
+        else if(dir == NORTH) gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y-HEIGHT/4), dir);
     }
     else if(bulletUpEnable == true){
         gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+HEIGHT/2), EAST);
@@ -833,18 +840,15 @@ void Player::shoot(){
 
 void Player::placeBomb(){
     gBomb.emplace_back(playerRect.x, playerRect.y);
-    printf("bomb placed");
 }
 
 bool Bullet::blanks(){
     SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
     if(checkCollision(gPlayers[0].getCollider(), bullet)&&gPlayers[0].shieldEnable == true){
-        printf("Player 1 shielded \n");
         gPlayers[0].life++;
         return false;
     }
     if(checkCollision(gPlayers[1].getCollider(), bullet)&&gPlayers[1].shieldEnable == true){
-        printf("Player 2 shielded \n");
         gPlayers[1].life++;
         return false;
     }
@@ -868,6 +872,7 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
 			break;
 		case BOMB:
             printf("bomb\n");
+            bombTimer.start();
             bombEnable = true;
             break;
 		case SHIELD:
@@ -897,7 +902,7 @@ PowerUp::PowerUp(LTexture* texture, int pwrUp_id){
 	powerUpRect = {x[randInd]+Tile::WIDTH/5, y[randInd]+Tile::HEIGHT/5, texture->getWidth(), texture->getLength()};
 	powerUpTex = texture;
 	id = pwrUp_id;
-	collider = {x[randInd]+Tile::WIDTH/5, y[randInd]+Tile::HEIGHT/5, WIDTH/2};
+	collider = {x[randInd]+Tile::WIDTH/5+WIDTH/2, y[randInd]+Tile::HEIGHT/5+WIDTH/2, WIDTH/2};
 }
 
 void PowerUp::render(){
@@ -932,12 +937,10 @@ bool Bullet::move(){
     }
 
     else if(checkCollision(gPlayers[0].getCollider(), bullet)){
-        printf("Player 1 hit \n");
         gPlayers[0].life--;
         return false;
     }
     else if(checkCollision(gPlayers[1].getCollider(), bullet)){
-        printf("Player 2 hit \n");
         gPlayers[1].life--;
         return false;
 
@@ -951,6 +954,10 @@ void Bullet::render(){
 	SDL_RenderFillRect(gRenderer, &bullet);
 }
 
+Circle& Bomb::getCollider(){
+	return collider;
+}
+
 void Bomb::render(){
     gBombTexture.render(bombPosX+Player::WIDTH-(bombPosX+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2-gBombTexture.getWidth()/2,
         bombPosY+Player::HEIGHT-(bombPosY+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2-gBombTexture.getLength()/2);
@@ -962,7 +969,7 @@ void Bomb::renderExplosion(){
 }
 
 void Bomb::blowUp(int x, int y){
-    for(int i = 1; i<=1; i++){
+    for(int i = 1; i<=scope; i++){
         if(gLevels[gLevel].tile((x+Tile::WIDTH*i), y) == gTiles[BRICK]){
             gLevels[gLevel].map[(x+Tile::WIDTH*i)/Tile::WIDTH][y/Tile::HEIGHT]=gTiles[GRASS];//right
         }
@@ -976,6 +983,17 @@ void Bomb::blowUp(int x, int y){
             gLevels[gLevel].map[(x)/Tile::WIDTH][(y+Tile::HEIGHT*i)/Tile::HEIGHT]=gTiles[GRASS];//down
         }
     }
+    for(int i = 0; i < gPlayers.size(); i++){
+    	if( (gPlayers[i].playerRect.x < x && gPlayers[i].playerRect.x > x-Tile::WIDTH*scope && (gPlayers[i].playerRect.y > y || gPlayers[i].playerRect.y < y+Tile::HEIGHT*scope)) //player on the left
+    		|| (gPlayers[i].playerRect.x > x + Tile::WIDTH && gPlayers[i].playerRect.x < x+Tile::WIDTH + (Tile::WIDTH*scope) && (gPlayers[i].playerRect.y > y || gPlayers[i].playerRect.y < y+Tile::HEIGHT*scope)) //player on the right
+    		|| (gPlayers[i].playerRect.y < y && gPlayers[i].playerRect.y > y-Tile::WIDTH*scope && (gPlayers[i].playerRect.x > x || gPlayers[i].playerRect.x < x+Tile::WIDTH*scope))//player on top
+    		|| (gPlayers[i].playerRect.y > y + Tile::HEIGHT && gPlayers[i].playerRect.y < y+Tile::HEIGHT+(Tile::HEIGHT*scope) && (gPlayers[i].playerRect.x > x || gPlayers[i].playerRect.x < x+Tile::WIDTH*scope))//player on bottom
+    		|| checkBombCollide(gPlayers[i].getCollider())//player on bomb
+    		){
+    		gPlayers[i].life--;
+    	}
+    }
+
 }
 
 bool init(){
@@ -1046,15 +1064,6 @@ bool loadMedia(){
 		gTiles[WATER] = new Tile({64, 0, 32, 32}, 1);
 		gTiles[EMPTY] = new Tile({96, 0, 32, 32}, 3);
 	}
-	//Load player textures
-	if(!gPlayerOneTexture.loadFromFile("Assets/p1.png")){
-		printf("Failed to load player 1 texture!\n");
-		success = false;
-	}
-	if(!gPlayerTwoTexture.loadFromFile("Assets/p2.png")){
-		printf("Failed to load player 2 texture!\n");
-		success = false;
-	}
     //Load power up textures
 	if(!gBombPowerUPTexture.loadFromFile("Assets/bomb.png")){
 		printf("Failed to load bomb texture!\n");
@@ -1086,6 +1095,13 @@ bool loadMedia(){
 		success = false;
 	}
 	return success;
+}
+
+bool checkBombCollide(Circle& player){
+	for(int i = 0; i < gBomb.size(); i++){
+        if(checkCollision(player, gBomb[i].getCollider()) && gBomb[i].timer.getTicks()>500)return true;
+        return false;
+    }
 }
 
 bool checkCollision(Circle& c1, Circle& c2){
@@ -1130,10 +1146,15 @@ void close(){
 	//Free loaded images
 	gPauseTextTexture.free();
 	gTimeTextTexture.free();
+	gLifeAvailableTexture.free();
 
 	gBombPowerUPTexture.free();
 	gShieldTexture.free();
 	gLifeTexture.free();
+	gBulletUpgradeTexture.free();
+
+	gBombTexture.free();
+	gExplosionTexture.free();
 
 	gPlayerOneTexture.free();
 	gPlayerTwoTexture.free();
@@ -1155,4 +1176,3 @@ void close(){
 	IMG_Quit();
 	SDL_Quit();
 }
-
