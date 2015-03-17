@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <iostream>
 
 #define PI 3.14159265
 
@@ -129,9 +130,7 @@ class Map{
 	SDL_Rect t;
  	public:
 		static const int ROWS = PLAYFIELD_HEIGHT/Tile::HEIGHT, COLS = SCREEN_WIDTH/Tile::WIDTH;
-
 		Map();
-
 		Tile* tile(int, int);
 		void hit(int, int);
 		void render();
@@ -179,15 +178,14 @@ class Player{
         LTimer shieldTimer;
         LTimer bombTimer;
 
-        bool collidedBomb;
-
 		Player(LTexture* texture, int lifeAvailableXPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
-			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb}, collidedBomb(false) {};
+			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb}{};
 
 		void act(const Uint8*);
 		void act(SDL_Scancode);
 		void move(int, int);
+
 		Circle& getCollider();
 		void shiftColliders();
 		void render();
@@ -219,20 +217,30 @@ class Bomb{
 	Circle collider;
     public:
         static const int WIDTH = 20, HEIGHT = 20;
-        static const int TIMER = 5;
+        static const int TIMER = 3;
+
+        LTimer timer;
 
         int bombPosX, bombPosY;
-        LTimer timer;
         int scope;
+        bool start;
+        
 
         Bomb(int x, int y):
-            bombPosX(x), bombPosY(y), collider{x+Player::WIDTH-(x+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2, y+Player::HEIGHT-(y+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2, WIDTH/2}, scope(1) {timer.start();};
+            bombPosX(x), bombPosY(y), collider{x+Player::WIDTH-(x+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2, y+Player::HEIGHT-(y+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2, WIDTH/2}, scope(1), start(false) {timer.start();};
         Circle& getCollider();
 		void shiftColliders();
         void render();
         void renderExplosion();
         void blowUp(int x, int y);
+};
 
+class Enemy{
+	public:
+		static const int WIDTH = 15, HEIGHT = 15;
+		int posX, posY;
+		Enemy();
+		void render();
 };
 
 //Starts up SDL and creates window
@@ -245,6 +253,9 @@ bool loadMedia();
 bool checkCollision(Circle& c1, Circle& c2);
 bool checkCollision(Circle& c1, SDL_Rect r);
 bool checkBombCollide(Circle& player);
+
+//gets grass tiles x and y pos and stores in x and y vectors
+void getGrassTilesPos();
 
 //Frees media and shuts down SDL
 void close();
@@ -261,6 +272,7 @@ TTF_Font* gFont = NULL;
 //Textures
 LTexture gPlayerOneTexture;
 LTexture gPlayerTwoTexture;
+LTexture gEnemyTexture;
 
 LTexture gBombPowerUPTexture;
 LTexture gShieldTexture;
@@ -268,13 +280,19 @@ LTexture gLifeTexture;
 LTexture gBulletUpgradeTexture;
 
 LTexture gTimeTextTexture;
-LTexture gPauseTextTexture;
 LTexture gMainTexture;
 
 LTexture gLifeAvailableTexture;
 
 LTexture gBombTexture;
 LTexture gExplosionTexture;
+
+LTexture gPlayerOneWins;
+LTexture gPlayerTwoWins;
+
+LTexture gPauseTexture;
+
+
 std::vector<Map> gLevels;
 int gLevel = 0;
 
@@ -286,6 +304,7 @@ std::vector<PowerUp> gPowerUps;
 std::vector<Bomb> gBomb;
 std::random_device type;
 
+//x and y pos of grass tiles
 std::vector<int> x;
 std::vector<int> y;
 
@@ -294,7 +313,6 @@ LTimer gDsplyPwrUpsTimer;
 
 LTexture gSpriteSheet;
 Tile* gTiles[4];
-
 
 int main(int argc, char *args[]){
 	//Start up SDL and create window
@@ -305,10 +323,13 @@ int main(int argc, char *args[]){
 		if(!loadMedia()){
 			printf("Failed to load media!\n");
 		}else{
-			//Main loop flag
+			int levelDuration = 120; 
+
+			//Main loop flags
 			bool quit = false;
 			bool start = false;
 			bool paused = false;
+			bool gameOver = false;
 
 			//initial player values
 			bool enableBombUp = false;
@@ -318,11 +339,17 @@ int main(int argc, char *args[]){
 			int p2LifeAvailablePosX= SCREEN_WIDTH-SCREEN_WIDTH/6;
 			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
 
+			//Level initialization
+			const int LEVELS = 1;
+			for(int i = 0; i < LEVELS; ++i){
+				gLevels.emplace_back();
+			}
+			getGrassTilesPos();
+
 			//Create players
-
-			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_V, SDL_SCANCODE_C);
+			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
 			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosX, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
-
+			Enemy enemy;
 
 			//Power ups variables
 			static const int NSETS = 4;
@@ -330,13 +357,12 @@ int main(int argc, char *args[]){
 			static const int DSPLYTIMEPWRUP = 8;
 
             //LIFE, BOMB, SHIELD, BULLETUPGRADE
-			static const int powerUpsSet[NSETS][NPOWERUPS] = {{0, 4, 2, 2}, {0, 2, 0, 0}, {3, 0, 1, 0}, {0, 0, 2, 0}};
+			static const int powerUpsSet[NSETS][NPOWERUPS] = {{0, 2, 0, 2}, {0, 2, 0, 0}, {3, 0, 1, 0}, {3, 0, 2, 0}};
 			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombPowerUPTexture, gShieldTexture, gBulletUpgradeTexture};
 
 			int set = 0;
-			int bombtime = 5;
 			bool nextSet = true;
-			int powerUpsTime[NSETS] = {2, 20, 40, 70};
+			int powerUpsTime[NSETS] = {110, 90, 70, 10};
 			int counter = 0;
 
 			//Event handler
@@ -348,11 +374,6 @@ int main(int argc, char *args[]){
 
 			//In memory text stream
 			std::stringstream timeText;
-
-			const int LEVELS = 1;
-			for(int i = 0; i < LEVELS; ++i){
-				gLevels.emplace_back();
-			}
 
 			//While application is running
 			while(!quit){
@@ -402,8 +423,21 @@ int main(int argc, char *args[]){
 					gMainTexture.render(0,0);
 				}
 
-				else if(!gTimer.isPaused()){
+				else if(paused){
+					SDL_RenderClear(gRenderer);
+					gPauseTexture.render(0,0);
+				}
+				else if(gameOver){
+					SDL_RenderClear(gRenderer);
+					if(gPlayers[0].life > gPlayers[1].life){
+						gPlayerOneWins.render(0,0);
+					}
+					else if(gPlayers[1].life > gPlayers[0].life){
+						gPlayerTwoWins.render(0,0);
+					}
+				}
 
+				else if(!gTimer.isPaused()&&!gameOver){
 					//Viewports
 					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
 					SDL_Rect playfield = {0, SCOREBOARD_HEIGHT, SCREEN_WIDTH, PLAYFIELD_HEIGHT};
@@ -416,7 +450,7 @@ int main(int argc, char *args[]){
 
 					//Set text to be rendered
 					timeText.str("");
-					timeText << "Time: " << gTimer.getTicks()/1000;
+					timeText << "Time: " << levelDuration - gTimer.getTicks()/1000;
 
 					//Render text
 					if(!gTimeTextTexture.loadFromRenderedText(timeText.str().c_str(), textColor)){
@@ -429,14 +463,19 @@ int main(int argc, char *args[]){
 
 					for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].renderLifeTexture();
+						if(gPlayers[i].life == 0){
+							gameOver = true;
+						}
 					}
+					if((levelDuration - gTimer.getTicks()/1000) == 0) gameOver = true;
+
 
 					SDL_RenderSetViewport(gRenderer, &playfield);
 					gLevels[gLevel].render();
 
-					if(gTimer.getTicks()/1000 > powerUpsTime[set] && set < NSETS){
+					if((levelDuration - gTimer.getTicks()/1000) < powerUpsTime[set] && set < NSETS){
 						for(int i = 0; i < gPowerUps.size(); i++){
-							gPowerUps[i].render();
+							gPowerUps[i].render();	
 							if(!gDsplyPwrUpsTimer.isStarted()){
 								gDsplyPwrUpsTimer.start();
 							}
@@ -448,6 +487,7 @@ int main(int argc, char *args[]){
 								printf("Powerups cleared\n");
 							}
 						}
+						enemy.render();
 					}
 
 					for(int i = 0; i < gBullets.size(); ++i){
@@ -501,12 +541,6 @@ int main(int argc, char *args[]){
                     else{
                         gPlayerTwoTexture.loadFromFile("Assets/p2.png");
                     }
-				}
-				else if(paused){
-					SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
-					SDL_RenderClear(gRenderer);
-					gPauseTextTexture.render(new SDL_Rect{(SCREEN_WIDTH-gPauseTextTexture.getWidth())/2,
-						(SCREEN_HEIGHT-gPauseTextTexture.getLength())/2, 0, 0});
 				}
 				SDL_RenderPresent(gRenderer);
 			}
@@ -817,7 +851,6 @@ void Player::move(int vx, int vy){
 	        playerRect.y -= vy;
 	        shiftColliders();
     	}
-    collidedBomb = false;
 }
 Circle& Player::getCollider(){
 	return collider;
@@ -894,15 +927,6 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect){
 }
 
 PowerUp::PowerUp(LTexture* texture, int pwrUp_id){
-	//Gets grass tiles positions for power up positioning
-	for(int i = 0; i < SCREEN_WIDTH; i+=Tile::WIDTH){
-		for(int j = 0; j < PLAYFIELD_HEIGHT; j+=Tile::HEIGHT){
-			if(gLevels[gLevel].tile(i,j) == gTiles[GRASS]){
-				x.push_back(i);
-				y.push_back(j);
-			}
-		}
-	}
 	//gets a random position to place the powerup
 	int randInd = type()%x.size();
 	powerUpRect = {x[randInd]+Tile::WIDTH/5, y[randInd]+Tile::HEIGHT/5, texture->getWidth(), texture->getLength()};
@@ -999,9 +1023,15 @@ void Bomb::blowUp(int x, int y){
     		gPlayers[i].life--;
     	}
     }
-
 }
-
+Enemy::Enemy(){
+	int randInd = type()%x.size();
+	posX = x[randInd];
+	posY = y[randInd];
+}
+void Enemy::render(){
+	gEnemyTexture.render(posX,posY);
+}
 bool init(){
 	//Initialization flag
 	bool success = true;
@@ -1053,6 +1083,18 @@ bool loadMedia(){
 		printf( "Unable to render main text texture!\n" );
 		success = false;
 	}
+	if(!gPauseTexture.loadFromFile("Assets/paused.png")){
+		printf( "Unable to render pause text texture!\n" );
+		success = false;
+	}
+	if(!gPlayerOneWins.loadFromFile("Assets/p1_wins.png")){
+		printf( "Unable to render P1 wins texture!\n" );
+		success = false;
+	}
+	if(!gPlayerTwoWins.loadFromFile("Assets/p2_wins.png")){
+		printf( "Unable to render P2 wins texture!\n" );
+		success = false;
+	}
 
 	//load font
 	gFont = TTF_OpenFont("Assets/ostrich.ttf", 50);
@@ -1061,12 +1103,7 @@ bool loadMedia(){
 		printf("Failed to load ostrich font! SDL_ttf Error: %s\n", TTF_GetError());
 		success = false;
 	}
-	else{
-		if(!gPauseTextTexture.loadFromRenderedText("Paused. Press P to Resume.", textColor) ){
-			printf( "Unable to render pause text texture!\n" );
-			success = false;
-		}
-	}
+	//load tiles
 	if(!gSpriteSheet.loadFromFile("Assets/terrain.png")){
 		printf("Failed to load terrain sprite sheet!\n");
 		success = false;
@@ -1106,14 +1143,25 @@ bool loadMedia(){
 		printf("Failed to load life available texture!\n");
 		success = false;
 	}
+	//load enemy
+	if(!gEnemyTexture.loadFromFile("Assets/enemy.png")){
+		printf("Failed to load enemy texture!\n");
+		success = false;
+	}
+
 	return success;
 }
 
 bool checkBombCollide(Circle& player){
 	for(int i = 0; i < gBomb.size(); i++){
-        if(checkCollision(player, gBomb[i].getCollider()) && gBomb[i].timer.getTicks()>500)return true;
-        return false;
+        if(!checkCollision(player, gBomb[i].getCollider())){
+        	gBomb[i].start = true;
+        }
+        if(checkCollision(player, gBomb[i].getCollider()) && gBomb[i].start){
+        	return true;
+        }
     }
+    return false;
 }
 
 bool checkCollision(Circle& c1, Circle& c2){
@@ -1154,12 +1202,24 @@ bool checkCollision(Circle& c1, SDL_Rect r){
     //If the shapes have not collided
     return false;
 }
+void getGrassTilesPos(){
+	for(int i = 0; i < SCREEN_WIDTH; i+=Tile::WIDTH){
+		for(int j = 0; j < PLAYFIELD_HEIGHT; j+=Tile::HEIGHT){
+			if(gLevels[gLevel].tile(i,j) == gTiles[GRASS]){
+				x.push_back(i);
+				y.push_back(j);
+			}
+		}
+	}
+}
 void close(){
 	//Free loaded images
-	gPauseTextTexture.free();
+	gPauseTexture.free();
 	gMainTexture.free();
 	gTimeTextTexture.free();
 	gLifeAvailableTexture.free();
+	gPlayerOneWins.free();
+	gPlayerTwoWins.free();
 
 	gBombPowerUPTexture.free();
 	gShieldTexture.free();
@@ -1171,6 +1231,7 @@ void close(){
 
 	gPlayerOneTexture.free();
 	gPlayerTwoTexture.free();
+	gEnemyTexture.free();
 
 	gSpriteSheet.free();
 
