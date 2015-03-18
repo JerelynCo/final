@@ -13,6 +13,6 @@ Submit your finals here. Here are a couple of reminders:
 <h3>Getting Started</h3>
 <p>Using the cmd or terminal, navigate to the folder where the game is located. Type in "make" then "./final"</p>
 
-<h5>See project specifications here: [google docs](https://docs.google.com/document/d/16q05iDh-MLStJEJh-Iw0zrEE1JaBTjyIdj_lzreLKh8/edit)</<h5>
+<h5>See project specifications here: [google docs](https://docs.google.com/document/d/16q05iDh-MLStJEJh-Iw0zrEE1JaBTjyIdj_lzreLKh8/edit)</h5>
 
-<h6>Authors: Jerelyn Co, Charles Edward Lee, and Marion Ivan Tan</h6>
+<h6>Authors: Jerelyn Co, Charles Edward Lee, and Marion Ivan Tan </h6>
