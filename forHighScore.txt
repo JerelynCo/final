@@ -1,0 +1,76 @@
+// reading a text file
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <algorithm>
+using namespace std;
+
+vector<string> strScores;
+vector<int> intScore;
+
+int main () {
+  string line;
+  ifstream myfile_Read ("example1.txt");
+  ofstream myfile;
+  myfile.open ("example.txt");
+  if (myfile_Read.is_open())
+  {
+    while ( getline (myfile_Read,line) )
+    {
+      strScores.push_back(line);
+    }
+    myfile_Read.close();
+  }
+  else cout << "Unable to open file";
+  for(int i = 0; i<strScores.size(); i++){
+    int num = atoi(strScores[i].c_str());
+    intScore.push_back(num);
+  }
+  sort(intScore.begin(), intScore.end());
+  for(int i = 0; i<intScore.size();i++){
+    cout<<intScore[i];
+    cout<<"\n";
+    myfile<<intScore[i];
+    myfile<<"\n";
+  }
+  return 0;
+}
+
+/*// sort() Example using arrays.
+// By Zereo 04/22/13
+#include <iostream>
+#include <algorithm>
+
+using namespace std;
+
+const int SIZE = 7;
+
+int main()
+{
+    int intArray[SIZE] = {5, 3, 32, -1, 1, 104, 53};
+
+    //Now we call the sort function
+    sort(intArray, intArray + SIZE);
+
+    cout << "Sorted Array looks like this." << endl;
+    for (size_t i = 0; i != SIZE; ++i)
+        cout << intArray[i] << " ";
+
+    return 0;
+}*/
+
+/*// basic file operations
+#include <iostream>
+#include <fstream>
+using namespace std;
+
+int main () {
+  ofstream myfile;
+  myfile.open ("example.txt");
+  for(int i = 0; i<=2; i++){
+    myfile << "Writing this to a file.\n";
+  }
+  myfile.close();
+  return 0;
+}*/
+
