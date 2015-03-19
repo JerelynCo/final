@@ -8,8 +8,11 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <algorithm>
 
 #define PI 3.14159265
+using namespace std;
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 1170;
@@ -156,7 +159,7 @@ class Bullet{
 };
 
 class Player{
-    
+
     int dir;
 	int lifeXPos;
 	LTexture* playerTex;
@@ -224,7 +227,7 @@ class Bomb{
         int bombPosX, bombPosY;
         int scope;
         bool start;
-        
+
 
         Bomb(int x, int y):
             bombPosX(x), bombPosY(y), collider{x+Player::WIDTH-(x+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2, y+Player::HEIGHT-(y+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2, WIDTH/2}, scope(1), start(false) {timer.start();};
@@ -242,6 +245,21 @@ class Enemy{
 		Enemy();
 		void render();
 };
+class highScores{
+    public:
+        string name;
+        int score;
+        highScores(string playerName, int playerScore);
+};
+highScores::highScores(string playerName, int playerScore){
+    name = playerName;
+    score = playerScore;
+}
+
+bool sortByScore(const highScores &lhs,const highScores &rhs){
+    return lhs.score>rhs.score;
+}
+
 
 //Starts up SDL and creates window
 bool init();
@@ -314,6 +332,63 @@ LTimer gDsplyPwrUpsTimer;
 LTexture gSpriteSheet;
 Tile* gTiles[4];
 
+//for the high score
+std::ifstream myfile_Read ("example1.txt");
+std::ofstream myfile;
+string line;
+string delim = ",";
+string playerName = "";
+string playerScore = "";
+
+int numScore = 0;
+
+
+vector<string> data;
+vector<string> names;
+vector<string> strScore;
+vector<int> intScore;
+vector<highScores> highScore;
+
+void getHighScore(){
+    myfile.open ("example.txt");
+
+    if (myfile_Read.is_open())
+    {
+        while ( getline (myfile_Read,line) )
+        {
+          data.push_back(line);
+        }
+        myfile_Read.close();
+    }
+    else cout << "Unable to open file";
+    //get data and push to appropriate vector
+    for(int i = 0; i<data.size(); i++){
+        playerName = data[i].substr(0,data[i].find(delim));
+        names.push_back(playerName);
+
+        playerScore = data[i].substr(data[i].find(delim)+1,data[i].find("\n"));
+        strScore.push_back(playerScore);
+    }
+    //convert string to int
+    for(int i = 0; i<strScore.size();i++){
+        numScore = atoi(strScore[i].c_str());
+        intScore.push_back(numScore);
+    }
+    //load highScores vector
+    for(int i = 0; i<data.size();i++){
+        highScore.emplace_back(names[i],intScore[i]);
+    }
+
+    sort(highScore.begin(),highScore.end(),sortByScore);
+    //write to text file
+    for(int i = 0; i<data.size();i++){
+        myfile<<highScore[i].name+",";
+        myfile<<highScore[i].score;
+        myfile<<"\n";
+    }
+}
+
+
 int main(int argc, char *args[]){
 	//Start up SDL and create window
 	if(!init()){
@@ -323,7 +398,7 @@ int main(int argc, char *args[]){
 		if(!loadMedia()){
 			printf("Failed to load media!\n");
 		}else{
-			int levelDuration = 120; 
+			int levelDuration = 120;
 
 			//Main loop flags
 			bool quit = false;
@@ -372,8 +447,10 @@ int main(int argc, char *args[]){
 			//Set text color as black
 			SDL_Color textColor = {255, 255, 255, 255};
 
+
 			//In memory text stream
 			std::stringstream timeText;
+
 
 			//While application is running
 			while(!quit){
@@ -421,6 +498,7 @@ int main(int argc, char *args[]){
 				if(!start){
 					SDL_RenderClear(gRenderer);
 					gMainTexture.render(0,0);
+
 				}
 
 				else if(paused){
@@ -428,6 +506,7 @@ int main(int argc, char *args[]){
 					gPauseTexture.render(0,0);
 				}
 				else if(gameOver){
+					//enter name here
 					SDL_RenderClear(gRenderer);
 					if(gPlayers[0].life > gPlayers[1].life){
 						gPlayerOneWins.render(0,0);
@@ -475,7 +554,7 @@ int main(int argc, char *args[]){
 
 					if((levelDuration - gTimer.getTicks()/1000) < powerUpsTime[set] && set < NSETS){
 						for(int i = 0; i < gPowerUps.size(); i++){
-							gPowerUps[i].render();	
+							gPowerUps[i].render();
 							if(!gDsplyPwrUpsTimer.isStarted()){
 								gDsplyPwrUpsTimer.start();
 							}
@@ -506,7 +585,7 @@ int main(int argc, char *args[]){
                         }
                         else{
                         	gBomb[i].render();
-                        }                      
+                        }
                     }
 
                     for(int i = 0; i < gPlayers.size(); i++){
@@ -545,9 +624,58 @@ int main(int argc, char *args[]){
 				SDL_RenderPresent(gRenderer);
 			}
 		}
-	}
+    }
 	close();
-	return 0;
+	myfile.open ("example.txt");
+
+    if (myfile_Read.is_open())
+    {
+        while ( getline (myfile_Read,line) )
+        {
+          data.push_back(line);
+        }
+        myfile_Read.close();
+    }
+    else cout << "Unable to open file";
+        //get data and push to appropriate vector
+    for(int i = 0; i<data.size(); i++){
+        playerName = data[i].substr(0,data[i].find(delim));
+        names.push_back(playerName);
+
+        playerScore = data[i].substr(data[i].find(delim)+1,data[i].find("\n"));
+        strScore.push_back(playerScore);
+    }
+
+	std::string player1 = "";
+    std::string player2 = "";
+    std::cout<<"please input Player one\n";
+    std::cin>>player1;
+    names.push_back(player1);
+    strScore.push_back("100");
+    std::cout<<"please input PLayer two\n";
+    std::cin>>player2;
+    names.push_back(player2);
+    strScore.push_back("9");
+    std::cout<<"player1: "+ player1+","+"player2: "+player2;
+    //convert string to int
+    for(int i = 0; i<strScore.size();i++){
+        numScore = atoi(strScore[i].c_str());
+        intScore.push_back(numScore);
+    }
+    //load highScores vector
+    for(int i = 0; i<data.size()+2;i++){
+        highScore.emplace_back(names[i],intScore[i]);
+    }
+
+    sort(highScore.begin(),highScore.end(),sortByScore);
+    //write to text file
+    for(int i = 0; i<data.size()+2;i++){
+        myfile<<highScore[i].name+",";
+        myfile<<highScore[i].score;
+        myfile<<"\n";
+    }
+
+    return 0;
 }
 
 LTexture::LTexture(){
@@ -832,7 +960,7 @@ void Player::move(int vx, int vy){
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
-		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
+		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider()))
 		|| (checkBombCollide(collider))
 		){
 	        playerRect.x -= vx;
@@ -845,7 +973,7 @@ void Player::move(int vx, int vy){
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
-		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
+		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider()))
 		|| (checkBombCollide(collider))
 		){
 	        playerRect.y -= vy;
