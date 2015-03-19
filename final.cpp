@@ -58,11 +58,11 @@ class LTexture{
 		~LTexture();
 
 		//Loads image at specified path
-		bool loadFromFile(std::string);
+		bool loadFromFile(string);
 
 		#ifdef _SDL_TTF_H
 		//Creates image from font string
-		bool loadFromRenderedText(std::string, SDL_Color);
+		bool loadFromRenderedText(string, SDL_Color);
 		#endif
 
 		//Deallocates texture
@@ -95,11 +95,12 @@ class LTimer{
 		//The ticks stored when the timer was paused
 		Uint32 mPausedTicks;
 
+
+
+	public:
 		//The timer status
 		bool mPaused;
 		bool mStarted;
-
-	public:
 		//Initializes variables
 		LTimer();
 
@@ -311,20 +312,20 @@ LTexture gPlayerTwoWins;
 LTexture gPauseTexture;
 
 
-std::vector<Map> gLevels;
+vector<Map> gLevels;
 int gLevel = 0;
 
-std::vector<Player> gPlayers;
-std::vector<Bullet> gBullets;
-std::vector<PowerUp> gPowerUps;
+vector<Player> gPlayers;
+vector<Bullet> gBullets;
+vector<PowerUp> gPowerUps;
 
 
-std::vector<Bomb> gBomb;
-std::random_device type;
+vector<Bomb> gBomb;
+random_device type;
 
 //x and y pos of grass tiles
-std::vector<int> x;
-std::vector<int> y;
+vector<int> x;
+vector<int> y;
 
 LTimer gTimer;
 LTimer gDsplyPwrUpsTimer;
@@ -333,8 +334,8 @@ LTexture gSpriteSheet;
 Tile* gTiles[4];
 
 //for the high score
-std::ifstream myfile_Read ("example1.txt");
-std::ofstream myfile;
+ifstream myfile_Read ("score.txt");
+ofstream myfile;
 string line;
 string delim = ",";
 string playerName = "";
@@ -342,52 +343,11 @@ string playerScore = "";
 
 int numScore = 0;
 
-
 vector<string> data;
 vector<string> names;
 vector<string> strScore;
 vector<int> intScore;
 vector<highScores> highScore;
-
-void getHighScore(){
-    myfile.open ("example.txt");
-
-    if (myfile_Read.is_open())
-    {
-        while ( getline (myfile_Read,line) )
-        {
-          data.push_back(line);
-        }
-        myfile_Read.close();
-    }
-    else cout << "Unable to open file";
-    //get data and push to appropriate vector
-    for(int i = 0; i<data.size(); i++){
-        playerName = data[i].substr(0,data[i].find(delim));
-        names.push_back(playerName);
-
-        playerScore = data[i].substr(data[i].find(delim)+1,data[i].find("\n"));
-        strScore.push_back(playerScore);
-    }
-    //convert string to int
-    for(int i = 0; i<strScore.size();i++){
-        numScore = atoi(strScore[i].c_str());
-        intScore.push_back(numScore);
-    }
-    //load highScores vector
-    for(int i = 0; i<data.size();i++){
-        highScore.emplace_back(names[i],intScore[i]);
-    }
-
-    sort(highScore.begin(),highScore.end(),sortByScore);
-    //write to text file
-    for(int i = 0; i<data.size();i++){
-        myfile<<highScore[i].name+",";
-        myfile<<highScore[i].score;
-        myfile<<"\n";
-    }
-}
-
 
 int main(int argc, char *args[]){
 	//Start up SDL and create window
@@ -405,6 +365,7 @@ int main(int argc, char *args[]){
 			bool start = false;
 			bool paused = false;
 			bool gameOver = false;
+			bool restart = false;
 
 			//initial player values
 			bool enableBombUp = false;
@@ -447,10 +408,8 @@ int main(int argc, char *args[]){
 			//Set text color as black
 			SDL_Color textColor = {255, 255, 255, 255};
 
-
 			//In memory text stream
-			std::stringstream timeText;
-
+			stringstream timeText;
 
 			//While application is running
 			while(!quit){
@@ -474,7 +433,8 @@ int main(int argc, char *args[]){
 								paused = true;
 							}
 
-						}else if(event.key.repeat == 0){
+						}
+						else if(event.key.repeat == 0){
 							for(int i = 0; i < gPlayers.size(); ++i){
 								gPlayers[i].act(event.key.keysym.scancode);
 							}
@@ -510,13 +470,20 @@ int main(int argc, char *args[]){
 					SDL_RenderClear(gRenderer);
 					if(gPlayers[0].life > gPlayers[1].life){
 						gPlayerOneWins.render(0,0);
+						/**reset variables of players**/
+						//gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
+                        //gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosX, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
+                        //restart = true;
 					}
 					else if(gPlayers[1].life > gPlayers[0].life){
 						gPlayerTwoWins.render(0,0);
+						//gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
+                        //gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosX, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
+                        //restart = true;
 					}
 				}
 
-				else if(!gTimer.isPaused()&&!gameOver){
+				else if((!gTimer.isPaused()&&!gameOver)){
 					//Viewports
 					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
 					SDL_Rect playfield = {0, SCOREBOARD_HEIGHT, SCREEN_WIDTH, PLAYFIELD_HEIGHT};
@@ -626,7 +593,7 @@ int main(int argc, char *args[]){
 		}
     }
 	close();
-	myfile.open ("example.txt");
+
 
     if (myfile_Read.is_open())
     {
@@ -646,17 +613,17 @@ int main(int argc, char *args[]){
         strScore.push_back(playerScore);
     }
 
-	std::string player1 = "";
-    std::string player2 = "";
-    std::cout<<"please input Player one\n";
-    std::cin>>player1;
+	string player1 = "";
+    string player2 = "";
+    cout<<"please input Player one\n";
+    cin>>player1;
     names.push_back(player1);
-    strScore.push_back("100");
-    std::cout<<"please input PLayer two\n";
-    std::cin>>player2;
+    strScore.push_back("200");
+    cout<<"please input PLayer two\n";
+    cin>>player2;
     names.push_back(player2);
-    strScore.push_back("9");
-    std::cout<<"player1: "+ player1+","+"player2: "+player2;
+    strScore.push_back("300");
+    cout<<"player1: "+ player1+","+"player2: "+player2;
     //convert string to int
     for(int i = 0; i<strScore.size();i++){
         numScore = atoi(strScore[i].c_str());
@@ -668,13 +635,14 @@ int main(int argc, char *args[]){
     }
 
     sort(highScore.begin(),highScore.end(),sortByScore);
+    myfile.open ("score.txt");
     //write to text file
     for(int i = 0; i<data.size()+2;i++){
         myfile<<highScore[i].name+",";
         myfile<<highScore[i].score;
         myfile<<"\n";
     }
-
+    myfile.close();
     return 0;
 }
 
@@ -690,7 +658,7 @@ LTexture::~LTexture(){
 	free();
 }
 
-bool LTexture::loadFromFile(std::string path){
+bool LTexture::loadFromFile(string path){
 	//Get rid of preexisting texture
 	free();
 
@@ -727,7 +695,7 @@ bool LTexture::loadFromFile(std::string path){
 }
 
 #ifdef _SDL_TTF_H
-bool LTexture::loadFromRenderedText(std::string textureText, SDL_Color textColor){
+bool LTexture::loadFromRenderedText(string textureText, SDL_Color textColor){
 	//Get rid of preexisting texture
 	free();
 
