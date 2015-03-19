@@ -276,6 +276,9 @@ bool checkBombCollide(Circle& player);
 //gets grass tiles x and y pos and stores in x and y vectors
 void getGrassTilesPos();
 
+//reset game
+void reset();
+
 //Frees media and shuts down SDL
 void close();
 
@@ -332,7 +335,8 @@ LTimer gDsplyPwrUpsTimer;
 
 LTexture gSpriteSheet;
 Tile* gTiles[4];
-
+//for resetting the game
+bool gameOver = false;
 //for the high score
 ifstream myfile_Read ("score.txt");
 ofstream myfile;
@@ -364,8 +368,7 @@ int main(int argc, char *args[]){
 			bool quit = false;
 			bool start = false;
 			bool paused = false;
-			bool gameOver = false;
-			bool restart = false;
+
 
 			//initial player values
 			bool enableBombUp = false;
@@ -466,24 +469,19 @@ int main(int argc, char *args[]){
 					gPauseTexture.render(0,0);
 				}
 				else if(gameOver){
-					//enter name here
 					SDL_RenderClear(gRenderer);
 					if(gPlayers[0].life > gPlayers[1].life){
 						gPlayerOneWins.render(0,0);
-						/**reset variables of players**/
-						//gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
-                        //gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosX, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
-                        //restart = true;
+						reset();
 					}
 					else if(gPlayers[1].life > gPlayers[0].life){
 						gPlayerTwoWins.render(0,0);
-						//gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
-                        //gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosX, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
-                        //restart = true;
+						reset();
 					}
 				}
 
-				else if((!gTimer.isPaused()&&!gameOver)){
+				//else if((!gTimer.isPaused()&&!gameOver)){
+				else if(!gameOver){
 					//Viewports
 					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
 					SDL_Rect playfield = {0, SCOREBOARD_HEIGHT, SCREEN_WIDTH, PLAYFIELD_HEIGHT};
@@ -593,7 +591,6 @@ int main(int argc, char *args[]){
 		}
     }
 	close();
-
 
     if (myfile_Read.is_open())
     {
@@ -1298,6 +1295,23 @@ bool checkCollision(Circle& c1, SDL_Rect r){
     //If the shapes have not collided
     return false;
 }
+
+
+
+void reset(){
+    gameOver = false;
+    gPlayers[0].playerRect.x = 5;
+    gPlayers[0].playerRect.y = 5;
+    gPlayers[0].shiftColliders();
+    gPlayers[1].playerRect.x = SCREEN_WIDTH-Player::WIDTH-5;
+    gPlayers[1].playerRect.y = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
+    gPlayers[1].shiftColliders();
+    for(int i = 0; i < gPlayers.size(); i++){
+        gPlayers[i].renderLifeTexture();
+        gPlayers[i].life = 3;
+    }
+}
+
 void getGrassTilesPos(){
 	for(int i = 0; i < SCREEN_WIDTH; i+=Tile::WIDTH){
 		for(int j = 0; j < PLAYFIELD_HEIGHT; j+=Tile::HEIGHT){
