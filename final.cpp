@@ -168,7 +168,9 @@ class Player{
 	Circle collider;
 	SDL_Scancode con[6];
 
+
 	public:
+		int score = 0;
 		int life = 3;
 		SDL_Rect playerRect;
 		static const int WIDTH = 20, HEIGHT = 20;
@@ -337,6 +339,10 @@ LTexture gSpriteSheet;
 Tile* gTiles[4];
 //for resetting the game
 bool gameOver = false;
+
+//for pausing the game
+bool disableCon = false;
+
 //for the high score
 ifstream myfile_Read ("score.txt");
 ofstream myfile;
@@ -467,21 +473,26 @@ int main(int argc, char *args[]){
 				else if(paused){
 					SDL_RenderClear(gRenderer);
 					gPauseTexture.render(0,0);
+					disableCon = true;
 				}
 				else if(gameOver){
 					SDL_RenderClear(gRenderer);
 					if(gPlayers[0].life > gPlayers[1].life){
 						gPlayerOneWins.render(0,0);
+						gPlayers[1].score++;
 						reset();
 					}
 					else if(gPlayers[1].life > gPlayers[0].life){
 						gPlayerTwoWins.render(0,0);
 						reset();
+						gPlayers[0].score++;
 					}
 				}
 
 				//else if((!gTimer.isPaused()&&!gameOver)){
 				else if(!gameOver){
+
+                    disableCon = false;
 					//Viewports
 					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
 					SDL_Rect playfield = {0, SCOREBOARD_HEIGHT, SCREEN_WIDTH, PLAYFIELD_HEIGHT};
@@ -610,22 +621,24 @@ int main(int argc, char *args[]){
         strScore.push_back(playerScore);
     }
 
-	string player1 = "";
-    string player2 = "";
-    cout<<"please input Player one\n";
-    cin>>player1;
-    names.push_back(player1);
-    strScore.push_back("200");
-    cout<<"please input PLayer two\n";
-    cin>>player2;
-    names.push_back(player2);
-    strScore.push_back("300");
-    cout<<"player1: "+ player1+","+"player2: "+player2;
     //convert string to int
     for(int i = 0; i<strScore.size();i++){
         numScore = atoi(strScore[i].c_str());
         intScore.push_back(numScore);
     }
+
+	string player1 = "";
+    string player2 = "";
+    cout<<"please input Player one\n";
+    cin>>player1;
+    names.push_back(player1);
+    intScore.push_back(gPlayers[0].score);
+    cout<<"please input PLayer two\n";
+    cin>>player2;
+    names.push_back(player2);
+    intScore.push_back(gPlayers[1].score);
+    cout<<"player1: "+ player1+","+"player2: "+player2;
+
     //load highScores vector
     for(int i = 0; i<data.size()+2;i++){
         highScore.emplace_back(names[i],intScore[i]);
@@ -902,18 +915,22 @@ void Map::render(){
 }
 
 void Player::act(const Uint8* state){
+    if(disableCon == false){
 	if(state[con[UP]]){move(0, -VEL); dir = NORTH;}
 	if(state[con[LEFT]]){move(-VEL, 0); dir = WEST;}
 	if(state[con[DOWN]]){move(0, VEL); dir = SOUTH;}
 	if(state[con[RIGHT]]){move(VEL, 0); dir = EAST;}
+    }
 }
 
 void Player::act(SDL_Scancode key){
+	if(disableCon == false){
 	if(key == con[SHOOT]){
         shoot();
 	}
 	if(key == con[PLACEBOMB]&&bombEnable == true){
         placeBomb();
+	}
 	}
 }
 
@@ -955,7 +972,7 @@ void Player::shiftColliders(){
 }
 
 void Player::shoot(){
-   //gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH/2), dir);
+
    if(bulletUpEnable == false){
         if(dir == EAST) gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+HEIGHT/2), dir);
         else if(dir == WEST) gBullets.emplace_back((playerRect.x-WIDTH/4), (playerRect.y+HEIGHT/2), dir);
@@ -1295,8 +1312,6 @@ bool checkCollision(Circle& c1, SDL_Rect r){
     //If the shapes have not collided
     return false;
 }
-
-
 
 void reset(){
     gameOver = false;

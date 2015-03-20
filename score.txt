@@ -2,12 +2,14 @@ Bomberman,1000
 spoderman,900
 Inavder,500
 ship,400
+wasd,360
 enter,300
+Niclo,250
 Eyer,200
 Hades,100
+Rea,100
 Ibam,100
 juasb,100
-Rea,100
 ghgj,90
 sdk,34
 High,13
@@ -21,4 +23,8 @@ sdv,9
 Kalvin,7
 hghj,7
 Patric,4
+Ivan,3
 glsa,1
+Shain,1
+,0
+,0
