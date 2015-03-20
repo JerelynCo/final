@@ -150,13 +150,13 @@ class Bullet{
 			x(xStart), y(yStart), w(WIDTH), h(HEIGHT), dir(direction){};
 
 		bool move();
+		bool move(int path, Uint32 t);
 		void render();
 		bool blanks();
 		SDL_Rect bullet;
 };
 
 class Player{
-    
     int dir;
 	int lifeXPos;
 	LTexture* playerTex;
@@ -165,7 +165,7 @@ class Player{
 	SDL_Scancode con[6];
 
 	public:
-		int life = 3;
+		int life = 5;
 		SDL_Rect playerRect;
 		static const int WIDTH = 20, HEIGHT = 20;
 		static const int VEL = 2;
@@ -236,10 +236,17 @@ class Bomb{
 };
 
 class Enemy{
+	Circle collider;
 	public:
-		static const int WIDTH = 15, HEIGHT = 15;
-		int posX, posY;
-		Enemy();
+		static const int WIDTH = 16, HEIGHT = 16;
+		int posX, posY, angle, vx, vy, path;
+		Enemy(int p);
+
+		Circle& getCollider();
+		void shiftColliders();
+		void shoot();
+		void move(Uint32 t);
+		void hit();
 		void render();
 };
 
@@ -253,6 +260,7 @@ bool loadMedia();
 bool checkCollision(Circle& c1, Circle& c2);
 bool checkCollision(Circle& c1, SDL_Rect r);
 bool checkBombCollide(Circle& player);
+bool checkEnemyCollide(Circle& player, int*);
 
 //gets grass tiles x and y pos and stores in x and y vectors
 void getGrassTilesPos();
@@ -299,6 +307,8 @@ int gLevel = 0;
 std::vector<Player> gPlayers;
 std::vector<Bullet> gBullets;
 std::vector<PowerUp> gPowerUps;
+std::vector<Enemy> gEnemies;
+std::vector<Bullet> gEnemyBullets;
 
 
 std::vector<Bomb> gBomb;
@@ -307,6 +317,8 @@ std::random_device type;
 //x and y pos of grass tiles
 std::vector<int> x;
 std::vector<int> y;
+
+bool controlCollision = true;
 
 LTimer gTimer;
 LTimer gDsplyPwrUpsTimer;
@@ -344,12 +356,12 @@ int main(int argc, char *args[]){
 			for(int i = 0; i < LEVELS; ++i){
 				gLevels.emplace_back();
 			}
+
 			getGrassTilesPos();
 
 			//Create players
 			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
 			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosX, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
-			Enemy enemy;
 
 			//Power ups variables
 			static const int NSETS = 4;
@@ -362,7 +374,7 @@ int main(int argc, char *args[]){
 
 			int set = 0;
 			bool nextSet = true;
-			int powerUpsTime[NSETS] = {110, 90, 70, 10};
+			int powerUpsTime[NSETS] = {119, 110, 95, 85};
 			int counter = 0;
 
 			//Event handler
@@ -414,6 +426,7 @@ int main(int argc, char *args[]){
 					for(int i = 0; i < NPOWERUPS; i++){
 						for(int j = 0; j < powerUpsSet[set][i]; j++){
 							gPowerUps.emplace_back(&powerUpsTex[i], i);
+							gEnemies.emplace_back(type()%4);
 						}
 					}
 					nextSet = false;
@@ -475,20 +488,31 @@ int main(int argc, char *args[]){
 
 					if((levelDuration - gTimer.getTicks()/1000) < powerUpsTime[set] && set < NSETS){
 						for(int i = 0; i < gPowerUps.size(); i++){
+							gEnemies[i].move(gTimer.getTicks());
+							//gEnemies[i].shoot();
 							gPowerUps[i].render();	
+							gEnemies[i].render();
 							if(!gDsplyPwrUpsTimer.isStarted()){
 								gDsplyPwrUpsTimer.start();
 							}
 							if(gDsplyPwrUpsTimer.getTicks()/1000 > DSPLYTIMEPWRUP){
 								gPowerUps.clear();
+								gEnemies.clear();
 								gDsplyPwrUpsTimer.stop();
 								nextSet = true;
 								set++;
 								printf("Powerups cleared\n");
 							}
-						}
-						enemy.render();
+						}	
 					}
+
+					for(int i = 0; i < gEnemyBullets.size(); ++i){
+                        if(gEnemyBullets[i].move(2, gTimer.getTicks())||gEnemyBullets[i].blanks()){
+                            gEnemyBullets[i].render();
+                        }else{
+                            gEnemyBullets.erase(gEnemyBullets.begin()+i);
+                        }
+                    }
 
 					for(int i = 0; i < gBullets.size(); ++i){
                         if(gBullets[i].move()||gBullets[i].blanks()){
@@ -834,6 +858,7 @@ void Player::move(int vx, int vy){
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
 		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
 		|| (checkBombCollide(collider))
+		|| (checkEnemyCollide(collider, &life))
 		){
 	        playerRect.x -= vx;
 	        shiftColliders();
@@ -847,6 +872,7 @@ void Player::move(int vx, int vy){
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
 		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
 		|| (checkBombCollide(collider))
+		|| (checkEnemyCollide(collider, &life))
 		){
 	        playerRect.y -= vy;
 	        shiftColliders();
@@ -862,7 +888,6 @@ void Player::shiftColliders(){
 }
 
 void Player::shoot(){
-   //gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH/2), dir);
    if(bulletUpEnable == false){
         if(dir == EAST) gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+HEIGHT/2), dir);
         else if(dir == WEST) gBullets.emplace_back((playerRect.x-WIDTH/4), (playerRect.y+HEIGHT/2), dir);
@@ -879,18 +904,6 @@ void Player::shoot(){
 
 void Player::placeBomb(){
     gBomb.emplace_back(playerRect.x, playerRect.y);
-}
-
-bool Bullet::blanks(){
-    SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
-    if(checkCollision(gPlayers[0].getCollider(), bullet)&&gPlayers[0].shieldEnable == true){
-        gPlayers[0].life++;
-        return false;
-    }
-    if(checkCollision(gPlayers[1].getCollider(), bullet)&&gPlayers[1].shieldEnable == true){
-        gPlayers[1].life++;
-        return false;
-    }
 }
 
 void Player::render(){
@@ -973,15 +986,35 @@ bool Bullet::move(){
     else if(checkCollision(gPlayers[1].getCollider(), bullet)){
         gPlayers[1].life--;
         return false;
-
     }
 	return true;
+}
+
+bool Bullet::move(int path, Uint32 t){
+/*	switch(path){
+		case 0:
+			x+=VEL*cos(PI*t/2);
+			y+=VEL*sin(PI*t/2);
+	}*/
+
 }
 
 void Bullet::render(){
 	SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
 	SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 	SDL_RenderFillRect(gRenderer, &bullet);
+}
+
+bool Bullet::blanks(){
+    SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
+    if(checkCollision(gPlayers[0].getCollider(), bullet)&&gPlayers[0].shieldEnable == true){
+        gPlayers[0].life++;
+        return false;
+    }
+    if(checkCollision(gPlayers[1].getCollider(), bullet)&&gPlayers[1].shieldEnable == true){
+        gPlayers[1].life++;
+        return false;
+    }
 }
 
 Circle& Bomb::getCollider(){
@@ -1024,14 +1057,88 @@ void Bomb::blowUp(int x, int y){
     	}
     }
 }
-Enemy::Enemy(){
+Enemy::Enemy(int p){
 	int randInd = type()%x.size();
-	posX = x[randInd];
-	posY = y[randInd];
+	posX = x[randInd] + WIDTH/2;
+	posY = y[randInd] + HEIGHT/2;
+
+	path = type()%4;
+
+	vx = type()%2-1;
+	vy = type()%2-1;
+	if(vx==0||vy==0){vx = 1; vy = 1;}
+
+	angle = 0;
+	collider = {posX, posY, WIDTH/2};
+}
+
+void Enemy::shoot(){
+	gEnemyBullets.emplace_back(posX, posY, WEST);
+}
+int sign=1;
+void Enemy::move(Uint32 t){
+	
+	switch(path){
+		//Linear movement
+		case 0:
+			posX+=vx;
+			if(posX < 0 || posX+WIDTH > SCREEN_WIDTH ){vx = -1*vx;}
+			posY+=vy;
+			if(posY < 0 || posY+HEIGHT > SCREEN_HEIGHT-SCOREBOARD_HEIGHT){vy = -1*vy;}
+			shiftColliders();
+			break;
+		//Sine wave
+		case 1:
+			posX += (t/1000)*sin(PI*t/1000);
+			posY +=  t/1000;
+			//if(posY < 0 || posY+HEIGHT > SCREEN_HEIGHT-SCOREBOARD_HEIGHT){sign = -1*sign;}
+			shiftColliders();
+			break;
+		//Circular
+		case 2:
+			posX += 5*cos(PI*t/1000);
+			posY += 5*sin(PI*(50-t)/1000);
+			shiftColliders();
+			break;
+		//
+		case 3:
+			posX += vx;
+			if(gLevels[gLevel].tile(posX+WIDTH, posY)->m > 0){posY+=vy;}
+			else{posX += vx;}
+			if(gLevels[gLevel].tile(posX+WIDTH, posY+HEIGHT)->m > 0){posX-=vx;}
+			else{posY+=vy;}
+			if(gLevels[gLevel].tile(posX, posY+HEIGHT)->m > 0){posY-=vy;}
+			else{posX-=vx;}
+			if(gLevels[gLevel].tile(posX, posY)->m > 0){posX+=vx;}
+			else{posY-=vy;}
+			shiftColliders();
+			break;
+	}
+	hit();
+}
+
+void Enemy::shiftColliders(){
+	collider.x = posX+collider.r;
+	collider.y = posY+collider.r;
+}
+
+Circle& Enemy::getCollider(){
+	return collider;
+}
+void Enemy::hit(){
+	for(int i = 0; i < gPlayers.size(); i++){
+		if(checkCollision(gPlayers[i].getCollider(), collider)){
+			gPlayers[i].life--;
+			vx = -1*vx;
+			vy = -1*vy;
+		}
+	}
 }
 void Enemy::render(){
-	gEnemyTexture.render(posX,posY);
+	angle++;
+	gEnemyTexture.render(posX, posY, NULL, angle);
 }
+
 bool init(){
 	//Initialization flag
 	bool success = true;
@@ -1163,6 +1270,17 @@ bool checkBombCollide(Circle& player){
     }
     return false;
 }
+bool checkEnemyCollide(Circle& player, int* life){
+	for(int i = 0; i < gEnemies.size(); i++){
+        if(checkCollision(player, gEnemies[i].getCollider()) && controlCollision){
+        	*life = *life-1;
+        	controlCollision = false;
+        	return true;
+        }
+        controlCollision = true;
+    }
+    return false;
+}
 
 bool checkCollision(Circle& c1, Circle& c2){
 	if(sqrt(pow(c1.x-c2.x, 2)+pow(c1.y-c2.y, 2)) < c1.r+c2.r){
@@ -1203,8 +1321,8 @@ bool checkCollision(Circle& c1, SDL_Rect r){
     return false;
 }
 void getGrassTilesPos(){
-	for(int i = 0; i < SCREEN_WIDTH; i+=Tile::WIDTH){
-		for(int j = 0; j < PLAYFIELD_HEIGHT; j+=Tile::HEIGHT){
+	for(int i = Tile::WIDTH*4; i < SCREEN_WIDTH - Tile::WIDTH*4; i+=Tile::WIDTH){
+		for(int j = Tile::WIDTH*4; j < PLAYFIELD_HEIGHT-Tile::WIDTH*4; j+=Tile::HEIGHT){
 			if(gLevels[gLevel].tile(i,j) == gTiles[GRASS]){
 				x.push_back(i);
 				y.push_back(j);
