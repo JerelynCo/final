@@ -375,7 +375,7 @@ int main(int argc, char *args[]){
 		if(!loadMedia()){
 			printf("Failed to load media!\n");
 		}else{
-			int levelDuration = 20;
+			int levelDuration = 120;
 
 			//Main loop flags
 			bool quit = false;
@@ -711,21 +711,9 @@ int main(int argc, char *args[]){
         numScore = atoi(strScore[i].c_str());
         intScore.push_back(numScore);
     }
-    //input winner score
-	//names.push_back(winnerName);
-    //intScore.push_back(winnerScore);
 
-    	string player1 = "";
-        string player2 = "";
-        //cout<<"please input Player one\n";
-        //cin>>player1;
-        names.push_back(winnerName);
-        intScore.push_back(winnerScore);
-        /*cout<<"please input PLayer two\n";
-        cin>>player2;
-        names.push_back(player2);
-        intScore.push_back(gPlayers[1].score);
-        cout<<"player1: "+ player1+","+"player2: "+player2;*/
+    names.push_back(winnerName);
+    intScore.push_back(winnerScore);
 
     //load Scores to highScore vector
     for(int i = 0; i<data.size()+1;i++){
