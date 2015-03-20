@@ -279,7 +279,7 @@ bool checkBombCollide(Circle& player);
 void getGrassTilesPos();
 
 //reset game
-void reset();
+void restart();
 
 //Frees media and shuts down SDL
 void close();
@@ -340,7 +340,7 @@ LTimer gDsplyPwrUpsTimer;
 LTexture gSpriteSheet;
 Tile* gTiles[4];
 //for resetting the game
-bool gameOver = false;
+bool reset = false;
 
 //for pausing the game
 bool disableCon = false;
@@ -370,12 +370,14 @@ int main(int argc, char *args[]){
 		if(!loadMedia()){
 			printf("Failed to load media!\n");
 		}else{
-			int levelDuration = 120;
+			int levelDuration = 20;
 
 			//Main loop flags
 			bool quit = false;
 			bool start = false;
 			bool paused = false;
+			bool gameOver = false;
+
 
 
 			//initial player values
@@ -479,22 +481,33 @@ int main(int argc, char *args[]){
 					gPauseTexture.render(0,0);
 					disableCon = true;
 				}
+
 				else if(gameOver){
+                    SDL_RenderClear(gRenderer);
+					if(gPlayers[0].score > gPlayers[1].score){
+						gPlayerOneWins.render(0,0);
+						printf("playerOne wins\n");
+					}
+					else if(gPlayers[1].score > gPlayers[0].score){
+						gPlayerTwoWins.render(0,0);
+						printf("playerOne wins\n");
+					}
+				}
+
+				else if(reset){
 					SDL_RenderClear(gRenderer);
 					if(gPlayers[0].life > gPlayers[1].life){
-						gPlayerOneWins.render(0,0);
 						gPlayers[0].score++;
-						reset();
+						restart();
 					}
 					else if(gPlayers[1].life > gPlayers[0].life){
-						gPlayerTwoWins.render(0,0);
-						reset();
 						gPlayers[1].score++;
+						restart();
 					}
 				}
 
 				//else if((!gTimer.isPaused()&&!gameOver)){
-				else if(!gameOver){
+				else if(!reset){
 
                     disableCon = false;
 					//Viewports
@@ -534,11 +547,13 @@ int main(int argc, char *args[]){
 					for(int i = 0; i < gPlayers.size(); i++){
 						gPlayers[i].renderLifeTexture();
 						if(gPlayers[i].life == 0){
-							gameOver = true;
+							reset = true;
 						}
 					}
-					if((levelDuration - gTimer.getTicks()/1000) == 0) gameOver = true;
 
+					if((levelDuration - gTimer.getTicks()/1000) == 0){
+                        gameOver = true;
+                    }
 
 					SDL_RenderSetViewport(gRenderer, &playfield);
 					gLevels[gLevel].render();
@@ -612,6 +627,7 @@ int main(int argc, char *args[]){
                         gPlayerTwoTexture.loadFromFile("Assets/p2.png");
                     }
 				}
+
 				SDL_RenderPresent(gRenderer);
 			}
 		}
@@ -1328,8 +1344,7 @@ bool checkCollision(Circle& c1, SDL_Rect r){
     return false;
 }
 
-void reset(){
-    int counter = 0;
+void restart(){
     SDL_RenderClear(gRenderer);
     gPlayers[0].playerRect.x = 5;
     gPlayers[0].playerRect.y = 5;
@@ -1339,13 +1354,12 @@ void reset(){
     gPlayers[1].shiftColliders();
     for(auto &Bullet: gBullets){
         gBullets.erase(gBullets.begin(),gBullets.end());
-        counter++;
     }
     for(int i = 0; i < gPlayers.size(); i++){
         gPlayers[i].renderLifeTexture();
         gPlayers[i].life = 3;
     }
-    gameOver = false;
+    reset = false;
 }
 
 void getGrassTilesPos(){

@@ -13,8 +13,8 @@ juasb,100
 ghgj,90
 sdk,34
 High,13
-Hello,12
 jeremy,12
+Hello,12
 Ivan,10
 Shaun,9
 TReanc,9
@@ -26,5 +26,7 @@ Patric,4
 Ivan,3
 glsa,1
 Shain,1
+Ivan,1
 ,0
 ,0
+sd,0
