@@ -318,6 +318,7 @@ LTexture gPlayerTwoWins;
 
 LTexture gPauseTexture;
 
+LTexture gInputTextTexture;
 
 vector<Map> gLevels;
 int gLevel = 0;
@@ -370,15 +371,13 @@ int main(int argc, char *args[]){
 		if(!loadMedia()){
 			printf("Failed to load media!\n");
 		}else{
-			int levelDuration = 20;
+			int levelDuration = 10;
 
 			//Main loop flags
 			bool quit = false;
 			bool start = false;
 			bool paused = false;
 			bool gameOver = false;
-
-
 
 			//initial player values
 			bool enableBombUp = false;
@@ -426,10 +425,21 @@ int main(int argc, char *args[]){
 			stringstream player1Score;
 			stringstream player2Score;
 
+            //The current input text.
+            std::string inputText = "Some Text";
+            gInputTextTexture.loadFromRenderedText( inputText.c_str(), textColor );
+
+            //Enable text input
+            SDL_StartTextInput();
 			//While application is running
 			while(!quit){
+
+				//The rerender text flag
+                bool renderText = false;
+
 				while(SDL_PollEvent(&event)){
-					//User requests quit
+
+                    //User requests quit
 					if(event.type == SDL_QUIT){
 						quit = true;
 					}
@@ -455,7 +465,20 @@ int main(int argc, char *args[]){
 							}
 						}
 					}
+					//Special text input event
+					else if( event.type == SDL_TEXTINPUT ) {
+                        //Not copy or pasting
+                        if( !( ( event.text.text[ 0 ] == 'c' || event.text.text[ 0 ] == 'C' ) && ( event.text.text[ 0 ] == 'v' || event.text.text[ 0 ] == 'V' ) && SDL_GetModState() & KMOD_CTRL ) ) {
+                        //Append character
+                        inputText += event.text.text;
+                        renderText = true;
+                        }
+					}
 				}
+
+
+
+
 
 				for(int i = 0; i < gPlayers.size(); ++i){
 					gPlayers[i].act(state);
@@ -484,14 +507,41 @@ int main(int argc, char *args[]){
 
 				else if(gameOver){
                     SDL_RenderClear(gRenderer);
-					if(gPlayers[0].score > gPlayers[1].score){
+					if(gPlayers[0].score == gPlayers[1].score){
 						gPlayerOneWins.render(0,0);
-						printf("playerOne wins\n");
+
+						if( renderText==true ) {
+                            //Text is not empty
+                            if( inputText != "" ) {
+                                //Render new text
+                                gInputTextTexture.loadFromRenderedText( inputText.c_str(), textColor );
+                            }
+                            //Text is empty
+                            else {
+                                //Render space texture
+                                gInputTextTexture.loadFromRenderedText( " ", textColor );
+                            }
+                        }
+                        gInputTextTexture.render( 400, 400 );
+
 					}
 					else if(gPlayers[1].score > gPlayers[0].score){
 						gPlayerTwoWins.render(0,0);
-						printf("playerOne wins\n");
-					}
+
+                        if( renderText==true ) {
+                            //Text is not empty
+                            if( inputText != "" ) {
+                                //Render new text
+                                gInputTextTexture.loadFromRenderedText( inputText.c_str(), textColor );
+                            }
+                            //Text is empty
+                            else {
+                                //Render space texture
+                                gInputTextTexture.loadFromRenderedText( " ", textColor );
+                            }
+                        }
+                        gInputTextTexture.render( 400, 400 );
+                    }
 				}
 
 				else if(reset){
@@ -634,6 +684,7 @@ int main(int argc, char *args[]){
     }
 	close();
     /***for the scoring***/
+    //get data from file push to data vector
     if (myfile_Read.is_open())
     {
         while ( getline (myfile_Read,line) )
@@ -643,7 +694,7 @@ int main(int argc, char *args[]){
         myfile_Read.close();
     }
     else cout << "Unable to open file";
-        //get data and push to appropriate vector
+    //get the name and score separated by a coma
     for(int i = 0; i<data.size(); i++){
         playerName = data[i].substr(0,data[i].find(delim));
         names.push_back(playerName);
@@ -652,12 +703,12 @@ int main(int argc, char *args[]){
         strScore.push_back(playerScore);
     }
 
-    //convert string to int
+    //since score is still a string needs to converted to a int
     for(int i = 0; i<strScore.size();i++){
         numScore = atoi(strScore[i].c_str());
         intScore.push_back(numScore);
     }
-
+    //input new players and score
 	string player1 = "";
     string player2 = "";
     cout<<"please input Player one\n";
@@ -670,14 +721,14 @@ int main(int argc, char *args[]){
     intScore.push_back(gPlayers[1].score);
     cout<<"player1: "+ player1+","+"player2: "+player2;
 
-    //load highScores vector
+    //load Scores to highScore vector
     for(int i = 0; i<data.size()+2;i++){
         highScore.emplace_back(names[i],intScore[i]);
     }
-
+    //sort who is the highest
     sort(highScore.begin(),highScore.end(),sortByScore);
     myfile.open ("score.txt");
-    //write to text file
+    //write to text file the new set of scores
     for(int i = 0; i<data.size()+2;i++){
         myfile<<highScore[i].name+",";
         myfile<<highScore[i].score;
