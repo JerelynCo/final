@@ -303,6 +303,8 @@ LTexture gShieldTexture;
 LTexture gLifeTexture;
 LTexture gBulletUpgradeTexture;
 
+LTexture gPlayer1ScoreTexture;
+LTexture gPlayer2ScoreTexture;
 LTexture gTimeTextTexture;
 LTexture gMainTexture;
 
@@ -419,6 +421,8 @@ int main(int argc, char *args[]){
 
 			//In memory text stream
 			stringstream timeText;
+			stringstream player1Score;
+			stringstream player2Score;
 
 			//While application is running
 			while(!quit){
@@ -479,13 +483,13 @@ int main(int argc, char *args[]){
 					SDL_RenderClear(gRenderer);
 					if(gPlayers[0].life > gPlayers[1].life){
 						gPlayerOneWins.render(0,0);
-						gPlayers[1].score++;
+						gPlayers[0].score++;
 						reset();
 					}
 					else if(gPlayers[1].life > gPlayers[0].life){
 						gPlayerTwoWins.render(0,0);
 						reset();
-						gPlayers[0].score++;
+						gPlayers[1].score++;
 					}
 				}
 
@@ -506,13 +510,24 @@ int main(int argc, char *args[]){
 					//Set text to be rendered
 					timeText.str("");
 					timeText << "Time: " << levelDuration - gTimer.getTicks()/1000;
-
+                    player1Score.str("");
+                    player1Score<<"Player 1: "<<gPlayers[0].score;
+                    player2Score.str("");
+                    player2Score<<"Player 2: "<<gPlayers[1].score;
 					//Render text
 					if(!gTimeTextTexture.loadFromRenderedText(timeText.str().c_str(), textColor)){
 						printf("Unable to render time texture!\n");
 					}
+					if(!gPlayer1ScoreTexture.loadFromRenderedText(player1Score.str().c_str(), textColor)){
+						printf("Unable to render player1score texture!\n");
+					}
+					if(!gPlayer2ScoreTexture.loadFromRenderedText(player2Score.str().c_str(), textColor)){
+						printf("Unable to render player2score texture!\n");
+					}
 
 					gTimeTextTexture.render((SCREEN_WIDTH-gTimeTextTexture.getWidth())/2, (SCOREBOARD_HEIGHT-gTimeTextTexture.getLength())/2);
+					gPlayer1ScoreTexture.render((SCREEN_WIDTH-gPlayer1ScoreTexture.getWidth())/2-300, (SCOREBOARD_HEIGHT-gPlayer1ScoreTexture.getLength())/2);
+					gPlayer2ScoreTexture.render((SCREEN_WIDTH-gPlayer2ScoreTexture.getWidth())/2+250, (SCOREBOARD_HEIGHT-gPlayer2ScoreTexture.getLength())/2);
 					gPlayerOneTexture.render(30, 15);
 					gPlayerTwoTexture.render(SCREEN_WIDTH-SCREEN_WIDTH/6-30, 15);
 
@@ -602,7 +617,7 @@ int main(int argc, char *args[]){
 		}
     }
 	close();
-
+    /***for the scoring***/
     if (myfile_Read.is_open())
     {
         while ( getline (myfile_Read,line) )
@@ -1314,17 +1329,23 @@ bool checkCollision(Circle& c1, SDL_Rect r){
 }
 
 void reset(){
-    gameOver = false;
+    int counter = 0;
+    SDL_RenderClear(gRenderer);
     gPlayers[0].playerRect.x = 5;
     gPlayers[0].playerRect.y = 5;
     gPlayers[0].shiftColliders();
     gPlayers[1].playerRect.x = SCREEN_WIDTH-Player::WIDTH-5;
     gPlayers[1].playerRect.y = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
     gPlayers[1].shiftColliders();
+    for(auto &Bullet: gBullets){
+        gBullets.erase(gBullets.begin(),gBullets.end());
+        counter++;
+    }
     for(int i = 0; i < gPlayers.size(); i++){
         gPlayers[i].renderLifeTexture();
         gPlayers[i].life = 3;
     }
+    gameOver = false;
 }
 
 void getGrassTilesPos(){
