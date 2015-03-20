@@ -318,7 +318,7 @@ LTexture gPlayerTwoWins;
 
 LTexture gPauseTexture;
 
-LTexture gInputTextTexture;
+LTexture gWinnerNameTexture;
 
 vector<Map> gLevels;
 int gLevel = 0;
@@ -354,7 +354,11 @@ string delim = ",";
 string playerName = "";
 string playerScore = "";
 
+//The current input text.
+string winnerName = "Winner: ";
+
 int numScore = 0;
+int winnerScore = 0;
 
 vector<string> data;
 vector<string> names;
@@ -371,7 +375,7 @@ int main(int argc, char *args[]){
 		if(!loadMedia()){
 			printf("Failed to load media!\n");
 		}else{
-			int levelDuration = 10;
+			int levelDuration = 20;
 
 			//Main loop flags
 			bool quit = false;
@@ -425,12 +429,9 @@ int main(int argc, char *args[]){
 			stringstream player1Score;
 			stringstream player2Score;
 
-            //The current input text.
-            std::string inputText = "Some Text";
-            gInputTextTexture.loadFromRenderedText( inputText.c_str(), textColor );
+            /**for inputing the text**/
+            gWinnerNameTexture.loadFromRenderedText( winnerName.c_str(), textColor );
 
-            //Enable text input
-            SDL_StartTextInput();
 			//While application is running
 			while(!quit){
 
@@ -465,20 +466,8 @@ int main(int argc, char *args[]){
 							}
 						}
 					}
-					//Special text input event
-					else if( event.type == SDL_TEXTINPUT ) {
-                        //Not copy or pasting
-                        if( !( ( event.text.text[ 0 ] == 'c' || event.text.text[ 0 ] == 'C' ) && ( event.text.text[ 0 ] == 'v' || event.text.text[ 0 ] == 'V' ) && SDL_GetModState() & KMOD_CTRL ) ) {
-                        //Append character
-                        inputText += event.text.text;
-                        renderText = true;
-                        }
-					}
+
 				}
-
-
-
-
 
 				for(int i = 0; i < gPlayers.size(); ++i){
 					gPlayers[i].act(state);
@@ -505,42 +494,56 @@ int main(int argc, char *args[]){
 					disableCon = true;
 				}
 
-				else if(gameOver){
+                else if(gameOver){
                     SDL_RenderClear(gRenderer);
-					if(gPlayers[0].score == gPlayers[1].score){
+                    bool inputPlayerOne = false;
+                    //Enable text input
+                    SDL_StartTextInput();
+                     while(SDL_PollEvent(&event)){
+                        if(event.type == SDL_QUIT){
+                            quit = true;
+					    }
+
+                        //Special text input event
+                        if( event.type == SDL_TEXTINPUT  ) {
+                            //Append character
+                            winnerName += event.text.text;
+                            renderText = true;
+
+                        }
+
+
+                    }
+					if(gPlayers[0].score > gPlayers[1].score){
+
+						winnerScore = gPlayers[0].score;
 						gPlayerOneWins.render(0,0);
 
 						if( renderText==true ) {
                             //Text is not empty
-                            if( inputText != "" ) {
+                            if( winnerName != "" ) {
                                 //Render new text
-                                gInputTextTexture.loadFromRenderedText( inputText.c_str(), textColor );
+                                gWinnerNameTexture.loadFromRenderedText( winnerName.c_str(), textColor );
                             }
-                            //Text is empty
-                            else {
-                                //Render space texture
-                                gInputTextTexture.loadFromRenderedText( " ", textColor );
-                            }
+
+
                         }
-                        gInputTextTexture.render( 400, 400 );
+                        gWinnerNameTexture.render( 400, 400);
 
 					}
-					else if(gPlayers[1].score > gPlayers[0].score){
+					else if(gPlayers[1].score > gPlayers[1].score){
 						gPlayerTwoWins.render(0,0);
-
+						winnerScore = gPlayers[1].score;
                         if( renderText==true ) {
                             //Text is not empty
-                            if( inputText != "" ) {
+                            if( winnerName != "" ) {
                                 //Render new text
-                                gInputTextTexture.loadFromRenderedText( inputText.c_str(), textColor );
+                                gWinnerNameTexture.loadFromRenderedText( winnerName.c_str(), textColor );
                             }
-                            //Text is empty
-                            else {
-                                //Render space texture
-                                gInputTextTexture.loadFromRenderedText( " ", textColor );
-                            }
+
+
                         }
-                        gInputTextTexture.render( 400, 400 );
+                        gWinnerNameTexture.render( 300, 400);
                     }
 				}
 
@@ -708,28 +711,31 @@ int main(int argc, char *args[]){
         numScore = atoi(strScore[i].c_str());
         intScore.push_back(numScore);
     }
-    //input new players and score
-	string player1 = "";
-    string player2 = "";
-    cout<<"please input Player one\n";
-    cin>>player1;
-    names.push_back(player1);
-    intScore.push_back(gPlayers[0].score);
-    cout<<"please input PLayer two\n";
-    cin>>player2;
-    names.push_back(player2);
-    intScore.push_back(gPlayers[1].score);
-    cout<<"player1: "+ player1+","+"player2: "+player2;
+    //input winner score
+	//names.push_back(winnerName);
+    //intScore.push_back(winnerScore);
+
+    	string player1 = "";
+        string player2 = "";
+        //cout<<"please input Player one\n";
+        //cin>>player1;
+        names.push_back(winnerName);
+        intScore.push_back(winnerScore);
+        /*cout<<"please input PLayer two\n";
+        cin>>player2;
+        names.push_back(player2);
+        intScore.push_back(gPlayers[1].score);
+        cout<<"player1: "+ player1+","+"player2: "+player2;*/
 
     //load Scores to highScore vector
-    for(int i = 0; i<data.size()+2;i++){
+    for(int i = 0; i<data.size()+1;i++){
         highScore.emplace_back(names[i],intScore[i]);
     }
     //sort who is the highest
     sort(highScore.begin(),highScore.end(),sortByScore);
     myfile.open ("score.txt");
     //write to text file the new set of scores
-    for(int i = 0; i<data.size()+2;i++){
+    for(int i = 0; i<data.size()+1;i++){
         myfile<<highScore[i].name+",";
         myfile<<highScore[i].score;
         myfile<<"\n";
