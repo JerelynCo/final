@@ -8,8 +8,11 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <algorithm>
 
 #define PI 3.14159265
+using namespace std;
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 1170;
@@ -55,11 +58,11 @@ class LTexture{
 		~LTexture();
 
 		//Loads image at specified path
-		bool loadFromFile(std::string);
+		bool loadFromFile(string);
 
 		#ifdef _SDL_TTF_H
 		//Creates image from font string
-		bool loadFromRenderedText(std::string, SDL_Color);
+		bool loadFromRenderedText(string, SDL_Color);
 		#endif
 
 		//Deallocates texture
@@ -92,11 +95,12 @@ class LTimer{
 		//The ticks stored when the timer was paused
 		Uint32 mPausedTicks;
 
+
+
+	public:
 		//The timer status
 		bool mPaused;
 		bool mStarted;
-
-	public:
 		//Initializes variables
 		LTimer();
 
@@ -156,7 +160,7 @@ class Bullet{
 };
 
 class Player{
-    
+
     int dir;
 	int lifeXPos;
 	LTexture* playerTex;
@@ -164,7 +168,9 @@ class Player{
 	Circle collider;
 	SDL_Scancode con[6];
 
+
 	public:
+		int score = 0;
 		int life = 3;
 		SDL_Rect playerRect;
 		static const int WIDTH = 20, HEIGHT = 20;
@@ -224,7 +230,7 @@ class Bomb{
         int bombPosX, bombPosY;
         int scope;
         bool start;
-        
+
 
         Bomb(int x, int y):
             bombPosX(x), bombPosY(y), collider{x+Player::WIDTH-(x+Player::WIDTH)%Tile::WIDTH+Tile::WIDTH/2, y+Player::HEIGHT-(y+Player::HEIGHT)%Tile::HEIGHT+Tile::HEIGHT/2, WIDTH/2}, scope(1), start(false) {timer.start();};
@@ -242,6 +248,21 @@ class Enemy{
 		Enemy();
 		void render();
 };
+class highScores{
+    public:
+        string name;
+        int score;
+        highScores(string playerName, int playerScore);
+};
+highScores::highScores(string playerName, int playerScore){
+    name = playerName;
+    score = playerScore;
+}
+
+bool sortByScore(const highScores &lhs,const highScores &rhs){
+    return lhs.score>rhs.score;
+}
+
 
 //Starts up SDL and creates window
 bool init();
@@ -256,6 +277,9 @@ bool checkBombCollide(Circle& player);
 
 //gets grass tiles x and y pos and stores in x and y vectors
 void getGrassTilesPos();
+
+//reset game
+void reset();
 
 //Frees media and shuts down SDL
 void close();
@@ -293,26 +317,47 @@ LTexture gPlayerTwoWins;
 LTexture gPauseTexture;
 
 
-std::vector<Map> gLevels;
+vector<Map> gLevels;
 int gLevel = 0;
 
-std::vector<Player> gPlayers;
-std::vector<Bullet> gBullets;
-std::vector<PowerUp> gPowerUps;
+vector<Player> gPlayers;
+vector<Bullet> gBullets;
+vector<PowerUp> gPowerUps;
 
 
-std::vector<Bomb> gBomb;
-std::random_device type;
+vector<Bomb> gBomb;
+random_device type;
 
 //x and y pos of grass tiles
-std::vector<int> x;
-std::vector<int> y;
+vector<int> x;
+vector<int> y;
 
 LTimer gTimer;
 LTimer gDsplyPwrUpsTimer;
 
 LTexture gSpriteSheet;
 Tile* gTiles[4];
+//for resetting the game
+bool gameOver = false;
+
+//for pausing the game
+bool disableCon = false;
+
+//for the high score
+ifstream myfile_Read ("score.txt");
+ofstream myfile;
+string line;
+string delim = ",";
+string playerName = "";
+string playerScore = "";
+
+int numScore = 0;
+
+vector<string> data;
+vector<string> names;
+vector<string> strScore;
+vector<int> intScore;
+vector<highScores> highScore;
 
 int main(int argc, char *args[]){
 	//Start up SDL and create window
@@ -323,13 +368,13 @@ int main(int argc, char *args[]){
 		if(!loadMedia()){
 			printf("Failed to load media!\n");
 		}else{
-			int levelDuration = 120; 
+			int levelDuration = 120;
 
 			//Main loop flags
 			bool quit = false;
 			bool start = false;
 			bool paused = false;
-			bool gameOver = false;
+
 
 			//initial player values
 			bool enableBombUp = false;
@@ -373,7 +418,7 @@ int main(int argc, char *args[]){
 			SDL_Color textColor = {255, 255, 255, 255};
 
 			//In memory text stream
-			std::stringstream timeText;
+			stringstream timeText;
 
 			//While application is running
 			while(!quit){
@@ -397,7 +442,8 @@ int main(int argc, char *args[]){
 								paused = true;
 							}
 
-						}else if(event.key.repeat == 0){
+						}
+						else if(event.key.repeat == 0){
 							for(int i = 0; i < gPlayers.size(); ++i){
 								gPlayers[i].act(event.key.keysym.scancode);
 							}
@@ -421,23 +467,32 @@ int main(int argc, char *args[]){
 				if(!start){
 					SDL_RenderClear(gRenderer);
 					gMainTexture.render(0,0);
+
 				}
 
 				else if(paused){
 					SDL_RenderClear(gRenderer);
 					gPauseTexture.render(0,0);
+					disableCon = true;
 				}
 				else if(gameOver){
 					SDL_RenderClear(gRenderer);
 					if(gPlayers[0].life > gPlayers[1].life){
 						gPlayerOneWins.render(0,0);
+						gPlayers[1].score++;
+						reset();
 					}
 					else if(gPlayers[1].life > gPlayers[0].life){
 						gPlayerTwoWins.render(0,0);
+						reset();
+						gPlayers[0].score++;
 					}
 				}
 
-				else if(!gTimer.isPaused()&&!gameOver){
+				//else if((!gTimer.isPaused()&&!gameOver)){
+				else if(!gameOver){
+
+                    disableCon = false;
 					//Viewports
 					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
 					SDL_Rect playfield = {0, SCOREBOARD_HEIGHT, SCREEN_WIDTH, PLAYFIELD_HEIGHT};
@@ -475,7 +530,7 @@ int main(int argc, char *args[]){
 
 					if((levelDuration - gTimer.getTicks()/1000) < powerUpsTime[set] && set < NSETS){
 						for(int i = 0; i < gPowerUps.size(); i++){
-							gPowerUps[i].render();	
+							gPowerUps[i].render();
 							if(!gDsplyPwrUpsTimer.isStarted()){
 								gDsplyPwrUpsTimer.start();
 							}
@@ -506,7 +561,7 @@ int main(int argc, char *args[]){
                         }
                         else{
                         	gBomb[i].render();
-                        }                      
+                        }
                     }
 
                     for(int i = 0; i < gPlayers.size(); i++){
@@ -545,9 +600,60 @@ int main(int argc, char *args[]){
 				SDL_RenderPresent(gRenderer);
 			}
 		}
-	}
+    }
 	close();
-	return 0;
+
+    if (myfile_Read.is_open())
+    {
+        while ( getline (myfile_Read,line) )
+        {
+          data.push_back(line);
+        }
+        myfile_Read.close();
+    }
+    else cout << "Unable to open file";
+        //get data and push to appropriate vector
+    for(int i = 0; i<data.size(); i++){
+        playerName = data[i].substr(0,data[i].find(delim));
+        names.push_back(playerName);
+
+        playerScore = data[i].substr(data[i].find(delim)+1,data[i].find("\n"));
+        strScore.push_back(playerScore);
+    }
+
+    //convert string to int
+    for(int i = 0; i<strScore.size();i++){
+        numScore = atoi(strScore[i].c_str());
+        intScore.push_back(numScore);
+    }
+
+	string player1 = "";
+    string player2 = "";
+    cout<<"please input Player one\n";
+    cin>>player1;
+    names.push_back(player1);
+    intScore.push_back(gPlayers[0].score);
+    cout<<"please input PLayer two\n";
+    cin>>player2;
+    names.push_back(player2);
+    intScore.push_back(gPlayers[1].score);
+    cout<<"player1: "+ player1+","+"player2: "+player2;
+
+    //load highScores vector
+    for(int i = 0; i<data.size()+2;i++){
+        highScore.emplace_back(names[i],intScore[i]);
+    }
+
+    sort(highScore.begin(),highScore.end(),sortByScore);
+    myfile.open ("score.txt");
+    //write to text file
+    for(int i = 0; i<data.size()+2;i++){
+        myfile<<highScore[i].name+",";
+        myfile<<highScore[i].score;
+        myfile<<"\n";
+    }
+    myfile.close();
+    return 0;
 }
 
 LTexture::LTexture(){
@@ -562,7 +668,7 @@ LTexture::~LTexture(){
 	free();
 }
 
-bool LTexture::loadFromFile(std::string path){
+bool LTexture::loadFromFile(string path){
 	//Get rid of preexisting texture
 	free();
 
@@ -599,7 +705,7 @@ bool LTexture::loadFromFile(std::string path){
 }
 
 #ifdef _SDL_TTF_H
-bool LTexture::loadFromRenderedText(std::string textureText, SDL_Color textColor){
+bool LTexture::loadFromRenderedText(string textureText, SDL_Color textColor){
 	//Get rid of preexisting texture
 	free();
 
@@ -809,18 +915,22 @@ void Map::render(){
 }
 
 void Player::act(const Uint8* state){
+    if(disableCon == false){
 	if(state[con[UP]]){move(0, -VEL); dir = NORTH;}
 	if(state[con[LEFT]]){move(-VEL, 0); dir = WEST;}
 	if(state[con[DOWN]]){move(0, VEL); dir = SOUTH;}
 	if(state[con[RIGHT]]){move(VEL, 0); dir = EAST;}
+    }
 }
 
 void Player::act(SDL_Scancode key){
+	if(disableCon == false){
 	if(key == con[SHOOT]){
         shoot();
 	}
 	if(key == con[PLACEBOMB]&&bombEnable == true){
         placeBomb();
+	}
 	}
 }
 
@@ -832,7 +942,7 @@ void Player::move(int vx, int vy){
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
-		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
+		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider()))
 		|| (checkBombCollide(collider))
 		){
 	        playerRect.x -= vx;
@@ -845,7 +955,7 @@ void Player::move(int vx, int vy){
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->m > 0
 		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
-		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
+		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider()))
 		|| (checkBombCollide(collider))
 		){
 	        playerRect.y -= vy;
@@ -862,7 +972,7 @@ void Player::shiftColliders(){
 }
 
 void Player::shoot(){
-   //gBullets.emplace_back((playerRect.x+WIDTH/2), (playerRect.y+LENGTH/2), dir);
+
    if(bulletUpEnable == false){
         if(dir == EAST) gBullets.emplace_back((playerRect.x+WIDTH), (playerRect.y+HEIGHT/2), dir);
         else if(dir == WEST) gBullets.emplace_back((playerRect.x-WIDTH/4), (playerRect.y+HEIGHT/2), dir);
@@ -1202,6 +1312,21 @@ bool checkCollision(Circle& c1, SDL_Rect r){
     //If the shapes have not collided
     return false;
 }
+
+void reset(){
+    gameOver = false;
+    gPlayers[0].playerRect.x = 5;
+    gPlayers[0].playerRect.y = 5;
+    gPlayers[0].shiftColliders();
+    gPlayers[1].playerRect.x = SCREEN_WIDTH-Player::WIDTH-5;
+    gPlayers[1].playerRect.y = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
+    gPlayers[1].shiftColliders();
+    for(int i = 0; i < gPlayers.size(); i++){
+        gPlayers[i].renderLifeTexture();
+        gPlayers[i].life = 3;
+    }
+}
+
 void getGrassTilesPos(){
 	for(int i = 0; i < SCREEN_WIDTH; i+=Tile::WIDTH){
 		for(int j = 0; j < PLAYFIELD_HEIGHT; j+=Tile::HEIGHT){
