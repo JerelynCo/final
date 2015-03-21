@@ -197,14 +197,13 @@ class Player{
 
 class PowerUp{
  	public:
+ 		static const int WIDTH = 20, HEIGHT = 20;
 	 	int id;
 		Circle collider;
 
 		LTexture* powerUpTex;
 		//Rect is changed to public
 	    SDL_Rect powerUpRect;
-		static const int WIDTH = 20, HEIGHT = 20;
-
 		PowerUp(LTexture* texture, int pwrUp_id);
 
 		void render();
@@ -489,7 +488,7 @@ int main(int argc, char *args[]){
 					if((levelDuration - gTimer.getTicks()/1000) < powerUpsTime[set] && set < NSETS){
 						for(int i = 0; i < gPowerUps.size(); i++){
 							gEnemies[i].move(gTimer.getTicks());
-							//gEnemies[i].shoot();
+							gEnemies[i].shoot();
 							gPowerUps[i].render();	
 							gEnemies[i].render();
 							if(!gDsplyPwrUpsTimer.isStarted()){
@@ -507,7 +506,7 @@ int main(int argc, char *args[]){
 					}
 
 					for(int i = 0; i < gEnemyBullets.size(); ++i){
-                        if(gEnemyBullets[i].move(2, gTimer.getTicks())||gEnemyBullets[i].blanks()){
+                        if(gEnemyBullets[i].move(0, gTimer.getTicks())||gEnemyBullets[i].blanks()){
                             gEnemyBullets[i].render();
                         }else{
                             gEnemyBullets.erase(gEnemyBullets.begin()+i);
@@ -991,11 +990,11 @@ bool Bullet::move(){
 }
 
 bool Bullet::move(int path, Uint32 t){
-/*	switch(path){
+	switch(path){
 		case 0:
 			x+=VEL*cos(PI*t/2);
 			y+=VEL*sin(PI*t/2);
-	}*/
+	}
 
 }
 
@@ -1073,11 +1072,10 @@ Enemy::Enemy(int p){
 }
 
 void Enemy::shoot(){
-	gEnemyBullets.emplace_back(posX, posY, WEST);
+	gEnemyBullets.emplace_back(posX, posY, NULL);
 }
 int sign=1;
 void Enemy::move(Uint32 t){
-	
 	switch(path){
 		//Linear movement
 		case 0:
