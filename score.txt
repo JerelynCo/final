@@ -1,1 +1,2 @@
 Winner: happy,1
+Winner: ,0
