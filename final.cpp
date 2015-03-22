@@ -172,7 +172,7 @@ class Player{
 		static const int SHIELD_DURATION = 10;
 		static const int BOMB_DURATION = 50;
 		SDL_Rect playerRect;
-		
+
 		int score = 0;
 		int life = 5;
         bool shieldEnable;
@@ -239,7 +239,7 @@ class Enemy{
 	public:
 		static const int WIDTH = 16, HEIGHT = 16;
 		int posX, posY, angle, vx, vy, path;
-		
+
 		Enemy(int p);
 		Circle& getCollider();
 		void shiftColliders();
@@ -326,7 +326,7 @@ vector<PowerUp> gPowerUps;
 vector<Enemy> gEnemies;
 vector<Bullet> gEnemyBullets;
 vector<Bomb> gBomb;
-vector<int> xTile; 
+vector<int> xTile;
 vector<int> yTile;
 
 //Rand device
@@ -364,6 +364,51 @@ vector<string> strScore;
 vector<int> intScore;
 vector<Score> highScore;
 
+void recordScore(){
+    /***for the scoring***/
+    //get data from file push to data vector
+    if (myfile_Read.is_open()){
+        while ( getline (myfile_Read,line) ){
+          data.push_back(line);
+        }
+        myfile_Read.close();
+    }
+    else cout << "Unable to open file";
+    //get the name and score separated by a coma
+    for(int i = 0; i<data.size(); i++){
+        playerName = data[i].substr(0,data[i].find(delim));
+        names.push_back(playerName);
+
+        playerScore = data[i].substr(data[i].find(delim)+1,data[i].find("\n"));
+        strScore.push_back(playerScore);
+    }
+    //since score is still a string needs to converted to a int
+    for(int i = 0; i<strScore.size();i++){
+        numScore = atoi(strScore[i].c_str());
+        intScore.push_back(numScore);
+    }
+    for(int i = 0; i<winnerName.length(); i++){
+        winnerName[i]= toupper(winnerName[i]);
+    }
+    names.push_back(winnerName);
+    intScore.push_back(winnerScore);
+
+    //load Scores to highScore vector
+    for(int i = 0; i<data.size()+1;i++){
+        highScore.emplace_back(names[i],intScore[i]);
+    }
+    //sort who is the highest
+    sort(highScore.begin(),highScore.end(),sortByScore);
+    myfile.open ("score.txt");
+    //write to text file the new set of scores
+    for(int i = 0; i<data.size()+1;i++){
+        myfile<<highScore[i].name+",";
+        myfile<<highScore[i].score;
+        myfile<<"\n";
+    }
+    myfile.close();
+}
+
 int main(int argc, char *args[]){
 	//Start up SDL and create window
 	if(!init()){
@@ -373,7 +418,7 @@ int main(int argc, char *args[]){
 		if(!loadMedia()){
 			printf("Failed to load media!\n");
 		}else{
-			int levelDuration = 120;
+			int levelDuration = 20;
 
 			//Main loop flags
 			bool quit = false;
@@ -493,14 +538,17 @@ int main(int argc, char *args[]){
                         if(event.type == SDL_QUIT){
                             quit = true;
 					    }
-                        //Special text input event
                         if( event.type == SDL_TEXTINPUT  ) {
-                            //Append character
                             winnerName += event.text.text;
+                            renderText = true;
+                        }
+                        if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE){
+                            winnerName.erase(winnerName.length()-1);
                             renderText = true;
                         }
                     }
 					if(gPlayers[0].score > gPlayers[1].score){
+
 
 						winnerScore = gPlayers[0].score;
 						gPlayerOneWins.render(0,0);
@@ -515,9 +563,11 @@ int main(int argc, char *args[]){
                         gWinnerNameTexture.render( 400, 400);
 
 					}
-					else if(gPlayers[1].score > gPlayers[1].score){
-						gPlayerTwoWins.render(0,0);
+					else if(gPlayers[1].score > gPlayers[0].score){
+
 						winnerScore = gPlayers[1].score;
+						gPlayerTwoWins.render(0,0);
+
                         if( renderText==true ) {
                             //Text is not empty
                             if( winnerName != "" ) {
@@ -525,7 +575,14 @@ int main(int argc, char *args[]){
                                 gWinnerNameTexture.loadFromRenderedText( winnerName.c_str(), textColor );
                             }
                         }
-                        gWinnerNameTexture.render( 300, 400);
+                        gWinnerNameTexture.render( 400, 400);
+                    }
+                    //tie
+                    else if(gPlayers[1].score == gPlayers[0].score){
+                        SDL_RenderClear(gRenderer);
+                        gameOver = false;
+                        gTimer.start();
+                        restart();
                     }
 				}
 
@@ -600,7 +657,7 @@ int main(int argc, char *args[]){
 
 					if((levelDuration - gTimer.getTicks()/1000) < powerUpsTime[set] && set < NSETS){
 						for(int i = 0; i < gPowerUps.size(); i++){
-							gPowerUps[i].render();	
+							gPowerUps[i].render();
 							gEnemies[i].move(gTimer.getTicks());
 							gEnemies[i].render();
 							if(!gDsplyPwrUpsTimer.isStarted()){
@@ -614,7 +671,7 @@ int main(int argc, char *args[]){
 								set++;
 								printf("Powerups cleared\n");
 							}
-						}	
+						}
 					}
 
 					for(int i = 0; i < gBullets.size(); ++i){
@@ -666,45 +723,8 @@ int main(int argc, char *args[]){
 		}
     }
 	close();
-    /***for the scoring***/
-    //get data from file push to data vector
-    if (myfile_Read.is_open()){
-        while ( getline (myfile_Read,line) ){
-          data.push_back(line);
-        }
-        myfile_Read.close();
-    }
-    else cout << "Unable to open file";
-    //get the name and score separated by a coma
-    for(int i = 0; i<data.size(); i++){
-        playerName = data[i].substr(0,data[i].find(delim));
-        names.push_back(playerName);
-
-        playerScore = data[i].substr(data[i].find(delim)+1,data[i].find("\n"));
-        strScore.push_back(playerScore);
-    }
-    //since score is still a string needs to converted to a int
-    for(int i = 0; i<strScore.size();i++){
-        numScore = atoi(strScore[i].c_str());
-        intScore.push_back(numScore);
-    }
-    names.push_back(winnerName);
-    intScore.push_back(winnerScore);
-
-    //load Scores to highScore vector
-    for(int i = 0; i<data.size()+1;i++){
-        highScore.emplace_back(names[i],intScore[i]);
-    }
-    //sort who is the highest
-    sort(highScore.begin(),highScore.end(),sortByScore);
-    myfile.open ("score.txt");
-    //write to text file the new set of scores
-    for(int i = 0; i<data.size()+1;i++){
-        myfile<<highScore[i].name+",";
-        myfile<<highScore[i].score;
-        myfile<<"\n";
-    }
-    myfile.close();
+	SDL_StopTextInput();
+    recordScore();
     return 0;
 }
 
@@ -1252,7 +1272,7 @@ void Enemy::move(Uint32 t){
 		case 3:
 			if(collect % 10 ==0){shoot();}
 			if(collect == 50) {collect = 0;}
-			collect++;	
+			collect++;
 	}
 	hit();
 }
