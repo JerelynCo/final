@@ -364,6 +364,51 @@ vector<string> strScore;
 vector<int> intScore;
 vector<Score> highScore;
 
+void recordScore(){
+    /***for the scoring***/
+    //get data from file push to data vector
+    if (myfile_Read.is_open()){
+        while ( getline (myfile_Read,line) ){
+          data.push_back(line);
+        }
+        myfile_Read.close();
+    }
+    else cout << "Unable to open file";
+    //get the name and score separated by a coma
+    for(int i = 0; i<data.size(); i++){
+        playerName = data[i].substr(0,data[i].find(delim));
+        names.push_back(playerName);
+
+        playerScore = data[i].substr(data[i].find(delim)+1,data[i].find("\n"));
+        strScore.push_back(playerScore);
+    }
+    //since score is still a string needs to converted to a int
+    for(int i = 0; i<strScore.size();i++){
+        numScore = atoi(strScore[i].c_str());
+        intScore.push_back(numScore);
+    }
+    for(int i = 0; i<winnerName.length(); i++){
+        winnerName[i]= toupper(winnerName[i]);
+    }
+    names.push_back(winnerName);
+    intScore.push_back(winnerScore);
+
+    //load Scores to highScore vector
+    for(int i = 0; i<data.size()+1;i++){
+        highScore.emplace_back(names[i],intScore[i]);
+    }
+    //sort who is the highest
+    sort(highScore.begin(),highScore.end(),sortByScore);
+    myfile.open ("score.txt");
+    //write to text file the new set of scores
+    for(int i = 0; i<data.size()+1;i++){
+        myfile<<highScore[i].name+",";
+        myfile<<highScore[i].score;
+        myfile<<"\n";
+    }
+    myfile.close();
+}
+
 int main(int argc, char *args[]){
 	//Start up SDL and create window
 	if(!init()){
@@ -493,9 +538,7 @@ int main(int argc, char *args[]){
                         if(event.type == SDL_QUIT){
                             quit = true;
 					    }
-                        //Special text input event
                         if( event.type == SDL_TEXTINPUT  ) {
-                            //Append character
                             winnerName += event.text.text;
                             renderText = true;
                         }
@@ -680,45 +723,8 @@ int main(int argc, char *args[]){
 		}
     }
 	close();
-    /***for the scoring***/
-    //get data from file push to data vector
-    if (myfile_Read.is_open()){
-        while ( getline (myfile_Read,line) ){
-          data.push_back(line);
-        }
-        myfile_Read.close();
-    }
-    else cout << "Unable to open file";
-    //get the name and score separated by a coma
-    for(int i = 0; i<data.size(); i++){
-        playerName = data[i].substr(0,data[i].find(delim));
-        names.push_back(playerName);
-
-        playerScore = data[i].substr(data[i].find(delim)+1,data[i].find("\n"));
-        strScore.push_back(playerScore);
-    }
-    //since score is still a string needs to converted to a int
-    for(int i = 0; i<strScore.size();i++){
-        numScore = atoi(strScore[i].c_str());
-        intScore.push_back(numScore);
-    }
-    names.push_back(winnerName);
-    intScore.push_back(winnerScore);
-
-    //load Scores to highScore vector
-    for(int i = 0; i<data.size()+1;i++){
-        highScore.emplace_back(names[i],intScore[i]);
-    }
-    //sort who is the highest
-    sort(highScore.begin(),highScore.end(),sortByScore);
-    myfile.open ("score.txt");
-    //write to text file the new set of scores
-    for(int i = 0; i<data.size()+1;i++){
-        myfile<<highScore[i].name+",";
-        myfile<<highScore[i].score;
-        myfile<<"\n";
-    }
-    myfile.close();
+	SDL_StopTextInput();
+    recordScore();
     return 0;
 }
 
