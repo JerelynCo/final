@@ -499,8 +499,13 @@ int main(int argc, char *args[]){
                             winnerName += event.text.text;
                             renderText = true;
                         }
+                        if( event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE){
+                            winnerName.erase(winnerName.length()-1);
+                            renderText = true;
+                        }
                     }
 					if(gPlayers[0].score > gPlayers[1].score){
+
 
 						winnerScore = gPlayers[0].score;
 						gPlayerOneWins.render(0,0);
