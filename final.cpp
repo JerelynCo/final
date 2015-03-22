@@ -12,17 +12,18 @@
 #define PI 3.14159265
 
 //Screen dimension constants
-const int SCREEN_WIDTH = 1170;
-const int SCREEN_HEIGHT = 600;
 const int SCOREBOARD_HEIGHT = 60;
-const int PLAYFIELD_HEIGHT = SCREEN_HEIGHT-SCOREBOARD_HEIGHT;
+const int PLAYFIELD_HEIGHT = 540;
 
-enum Terrain{
-	GRASS, BRICK, WATER, EMPTY
+const int SCREEN_WIDTH = 1170;
+const int SCREEN_HEIGHT = SCOREBOARD_HEIGHT+PLAYFIELD_HEIGHT;
+
+enum Tiles{
+	GRASS, BRICK, WATER, STEEL, SLIDE, TOTAL_TILES
 };
 
-enum Direction{
-	SOUTH, WEST, NORTH, EAST
+enum Directions{
+	SOUTH, WEST, NORTH, EAST, TOTAL_DIRECTIONS
 };
 
 enum Controls{
@@ -39,7 +40,6 @@ struct Circle{
 };
 
 class LTexture{
-
    		//The actual hardware texture
 		SDL_Texture* mTexture;
 
@@ -81,8 +81,6 @@ class LTexture{
 		//Gets image dimensions
 		int getWidth();
 		int getLength();
-
-
 };
 
 class LTimer{
@@ -115,27 +113,57 @@ class LTimer{
 };
 
 class Tile{
+		int tileType;	//Used to determine the reaction of the tile
+		int walkability;	//The level of mobility a player needs to have to traverse the tile
+		std::vector<SDL_Rect> renderSrc;	//The area of the texture/s to be rendered
+		
 	public:
 		static const int HEIGHT = 30, WIDTH = 30;
-
-		SDL_Rect t;
-		const Uint8 m;
-
-		Tile(SDL_Rect tile, Uint8 mobility):
-			t(tile), m(mobility) {};
+		
+		Tile(int tileType):
+			tileType(tileType) {
+				switch(tileType){
+					case GRASS:
+						renderSrc.push_back({0, 0, 32, 32});
+						walkability = 0;
+						break;
+					case BRICK:
+						renderSrc.push_back({32, 0, 32, 32});
+						walkability = 2;
+						break;
+					case WATER:
+						renderSrc.push_back({64, 0, 32, 32});
+						walkability = 1;
+						break;
+					case STEEL:
+						renderSrc.push_back({96, 0, 32, 32});
+						walkability = 3;
+						break;
+					case SLIDE:
+						for(int i = 0; i < 4; ++i){
+							renderSrc.push_back({32*i, 32, 32, 32});
+						}
+						walkability = 0;
+						break;
+				}
+			};
+		
+		int getWalkability();
+		void render(int, SDL_Rect, int);
 };
 
-
 class Map{
-	SDL_Rect t;
+		SDL_Rect t;
+	
  	public:
 		static const int ROWS = PLAYFIELD_HEIGHT/Tile::HEIGHT, COLS = SCREEN_WIDTH/Tile::WIDTH;
 		Map();
 		Tile* tile(int, int);
 		void hit(int, int);
-		void render();
+		void render(int);
 
 		Tile* map[COLS][ROWS];
+		int direction[COLS][ROWS];	//Direction the tiles are facing / angle of rotation of the tiles
 
 };
 
@@ -155,14 +183,15 @@ class Bullet{
 		SDL_Rect bullet;
 };
 
-class Player{
-    
-    int dir;
-	int lifeXPos;
-	LTexture* playerTex;
-	LTexture* playerLifeTex;
-	Circle collider;
-	SDL_Scancode con[6];
+class Player{    
+		int dir;
+		int lifeXPos;
+		LTexture* playerTex;
+		LTexture* playerLifeTex;
+		Circle collider;
+		SDL_Scancode con[6];
+		
+		void react();
 
 	public:
 		int life = 3;
@@ -180,7 +209,7 @@ class Player{
 
 		Player(LTexture* texture, int lifeAvailableXPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
-			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb}{};
+			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb} {};
 
 		void act(const Uint8*);
 		void act(SDL_Scancode);
@@ -254,7 +283,7 @@ bool checkCollision(Circle& c1, Circle& c2);
 bool checkCollision(Circle& c1, SDL_Rect r);
 bool checkBombCollide(Circle& player);
 
-//gets grass tiles x and y pos and stores in x and y vectors
+//Gets grass tiles x and y pos and stores in x and y vectors
 void getGrassTilesPos();
 
 //Frees media and shuts down SDL
@@ -292,14 +321,12 @@ LTexture gPlayerTwoWins;
 
 LTexture gPauseTexture;
 
-
 std::vector<Map> gLevels;
 int gLevel = 0;
 
 std::vector<Player> gPlayers;
 std::vector<Bullet> gBullets;
 std::vector<PowerUp> gPowerUps;
-
 
 std::vector<Bomb> gBomb;
 std::random_device type;
@@ -312,7 +339,7 @@ LTimer gTimer;
 LTimer gDsplyPwrUpsTimer;
 
 LTexture gSpriteSheet;
-Tile* gTiles[4];
+Tile* gTiles[TOTAL_TILES];
 
 int main(int argc, char *args[]){
 	//Start up SDL and create window
@@ -340,7 +367,7 @@ int main(int argc, char *args[]){
 			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
 
 			//Level initialization
-			const int LEVELS = 1;
+			const int LEVELS = 1;	//Currently only creates 1 level
 			for(int i = 0; i < LEVELS; ++i){
 				gLevels.emplace_back();
 			}
@@ -349,6 +376,7 @@ int main(int argc, char *args[]){
 			//Create players
 			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
 			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosX, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
+			
 			Enemy enemy;
 
 			//Power ups variables
@@ -369,11 +397,13 @@ int main(int argc, char *args[]){
 			SDL_Event event;
 			const Uint8* state = SDL_GetKeyboardState(NULL);
 
-			//Set text color as black
+			//Set text colour as black
 			SDL_Color textColor = {255, 255, 255, 255};
 
 			//In memory text stream
 			std::stringstream timeText;
+			
+			int frame = 0;
 
 			//While application is running
 			while(!quit){
@@ -409,7 +439,7 @@ int main(int argc, char *args[]){
 					gPlayers[i].act(state);
 				}
 
-				//Loads new set of powerups when nextSet flag is set to true (time dependent)
+				//Loads new set of Powerups when nextSet flag is set to true (time dependent)
 				if(nextSet && set < NSETS){
 					for(int i = 0; i < NPOWERUPS; i++){
 						for(int j = 0; j < powerUpsSet[set][i]; j++){
@@ -471,7 +501,7 @@ int main(int argc, char *args[]){
 
 
 					SDL_RenderSetViewport(gRenderer, &playfield);
-					gLevels[gLevel].render();
+					gLevels[gLevel].render(frame);
 
 					if((levelDuration - gTimer.getTicks()/1000) < powerUpsTime[set] && set < NSETS){
 						for(int i = 0; i < gPowerUps.size(); i++){
@@ -543,6 +573,8 @@ int main(int argc, char *args[]){
                     }
 				}
 				SDL_RenderPresent(gRenderer);
+				
+				++frame;
 			}
 		}
 	}
@@ -671,7 +703,6 @@ void LTexture::render(int x, int y, SDL_Rect* clip, double angle, SDL_Point* cen
 	SDL_RenderCopyEx(gRenderer, mTexture, clip, &renderQuad, angle, center, flip);
 }
 
-
 int LTexture::getWidth(){
 	return mWidth;
 }
@@ -763,15 +794,27 @@ bool LTimer::isPaused(){
 	return mPaused && mStarted;
 }
 
+int Tile::getWalkability(){
+	return walkability;
+}
+
+void Tile::render(int frame, SDL_Rect renderDst, int direction){
+	gSpriteSheet.render(&renderDst, &renderSrc[frame/2%renderSrc.size()], direction*90);
+	//printf("%i\t", direction);
+}
+
 Map::Map(){
 	for(int i = 0; i < ROWS; ++i){
 		for(int j = 0; j < COLS; ++j){
-			if(i%2 == 0 || j%2 == 0){
-				if((i == 0 && j == 0)
-					|| (i == 0 && j == COLS-1)
-					|| (i == ROWS-1 && j == 0)
-					|| (i == ROWS-1 && j == COLS-1)){
-					map[j][i] = gTiles[GRASS];
+			direction[j][i] = 0;
+			if((i == 0 && j == 0)
+				|| (i == 0 && j == COLS-1)
+				|| (i == ROWS-1 && j == 0)
+				|| (i == ROWS-1 && j == COLS-1)){
+				map[j][i] = gTiles[GRASS];
+			}else if(i%2 == 0 || j%2 == 0){
+				if(type()%100 < 10){	//1/100 (or 1%) probability of spawning a SLIDE tile
+					map[j][i] = gTiles[SLIDE];
 				}else{
 					map[j][i] = gTiles[type()%2];
 				}
@@ -780,7 +823,28 @@ Map::Map(){
 			}
 		}
 	}
-	t = {0, 0, Tile::WIDTH, Tile::HEIGHT};
+	
+	for(int i = 0; i < ROWS; ++i){
+		for(int j = 0; j < COLS; ++j){
+			if(map[j][i] == gTiles[SLIDE]){
+				for(int k = 0; k < 4; ++k){
+					if(j+int(cos((direction[j][i]+2)*PI/2)) >= 0 && j+int(cos((direction[j][i]+2)*PI/2)) < Map::COLS
+					&& i+int(sin((direction[j][i]+2)*PI/2)) >= 0 && i+int(sin((direction[j][i]+2)*PI/2)) < Map::ROWS){
+						if(map[j+int(cos((direction[j][i]+2)*PI/2))][i+int(sin((direction[j][i]+2)*PI/2))]->getWalkability() != 0){
+							direction[j][i] = (direction[j][i]+1)%4;
+							if(k == 3){
+								map[j][i] = gTiles[type()%2];
+							}
+						}
+						//printf("%i\t%i\n", j+int(cos((direction[j][i]+2)*PI/2)), i+int(sin((direction[j][i]+2)*PI/2)));
+					}
+				}
+			}
+		}
+	}
+	
+	t.w = Tile::WIDTH;
+	t.h = Tile::HEIGHT;
 }
 
 Tile* Map::tile(int x, int y){
@@ -788,7 +852,7 @@ Tile* Map::tile(int x, int y){
 		&& y >= 0 && y < Tile::HEIGHT*Map::ROWS){
 		return map[x/Tile::WIDTH][y/Tile::HEIGHT];
 	}else{
-		return gTiles[EMPTY];
+		return gTiles[STEEL];
 	}
 }
 
@@ -798,12 +862,13 @@ void Map::hit(int x, int y){
 	}
 }
 
-void Map::render(){
+void Map::render(int frame){
 	for(int i = 0; i < ROWS; ++i){
 		for(int j = 0; j < COLS; ++j){
 			t.x = j*Tile::WIDTH;
 			t.y = i*Tile::HEIGHT;
-			gSpriteSheet.render(&t, &(map[j][i]->t));
+			
+			map[j][i]->render(frame, t, direction[j][i]);
 		}
 	}
 }
@@ -813,6 +878,7 @@ void Player::act(const Uint8* state){
 	if(state[con[LEFT]]){move(-VEL, 0); dir = WEST;}
 	if(state[con[DOWN]]){move(0, VEL); dir = SOUTH;}
 	if(state[con[RIGHT]]){move(VEL, 0); dir = EAST;}
+	react();
 }
 
 void Player::act(SDL_Scancode key){
@@ -824,34 +890,47 @@ void Player::act(SDL_Scancode key){
 	}
 }
 
+void Player::react(){
+	if(gLevels[gLevel].tile(playerRect.x, playerRect.y) == gTiles[SLIDE]){
+		switch((gLevels[gLevel].direction[playerRect.x/Tile::WIDTH][playerRect.y/Tile::HEIGHT]+1)%4){
+			case NORTH: move(0, -VEL); break;
+			case SOUTH: move(0, VEL); break;
+			case EAST: move(VEL, 0); break;
+			case WEST: move(-VEL, 0); break;
+		}
+	}
+}
+
 void Player::move(int vx, int vy){
     playerRect.x += vx;//whatever the position of the rectangle is will also be the position where the rectangel will be rendered
     shiftColliders();
 
-    if((gLevels[gLevel].tile(playerRect.x, playerRect.y))->m > 0
-		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->m > 0
-		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->m > 0
-		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
+    if((gLevels[gLevel].tile(playerRect.x, playerRect.y))->getWalkability() > 0
+		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->getWalkability() > 0
+		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->getWalkability() > 0
+		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->getWalkability() > 0
 		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
 		|| (checkBombCollide(collider))
 		){
-	        playerRect.x -= vx;
-	        shiftColliders();
-    	}
-    playerRect.y += vy;//whatever the position of the rectangle is will also be the position where the rectangel will be rendered
+		playerRect.x -= vx;
+		shiftColliders();
+    }
+    
+	playerRect.y += vy;//whatever the position of the rectangle is will also be the position where the rectangel will be rendered
     shiftColliders();
 
-    if((gLevels[gLevel].tile(playerRect.x, playerRect.y))->m > 0
-		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->m > 0
-		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->m > 0
-		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->m > 0
+    if((gLevels[gLevel].tile(playerRect.x, playerRect.y))->getWalkability() > 0
+		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y))->getWalkability() > 0
+		|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT))->getWalkability() > 0
+		|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->getWalkability() > 0
 		|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
 		|| (checkBombCollide(collider))
 		){
-	        playerRect.y -= vy;
-	        shiftColliders();
-    	}
+		playerRect.y -= vy;
+		shiftColliders();
+    }
 }
+
 Circle& Player::getCollider(){
 	return collider;
 }
@@ -947,7 +1026,6 @@ Circle& PowerUp::getCollider(){
     return collider;
 }
 
-
 bool Bullet::move(){
 	x += VEL*cos(PI*(dir+1)/2);
 	y += VEL*sin(PI*(dir+1)/2);
@@ -962,7 +1040,7 @@ bool Bullet::move(){
         gLevels[gLevel].hit(x+WIDTH, y+HEIGHT);
         return false;
     }
-    else if(gLevels[gLevel].tile(x, y) == gTiles[EMPTY]){
+    else if(gLevels[gLevel].tile(x, y) == gTiles[STEEL]){
         return false;
     }
 
@@ -1024,14 +1102,17 @@ void Bomb::blowUp(int x, int y){
     	}
     }
 }
+
 Enemy::Enemy(){
 	int randInd = type()%x.size();
 	posX = x[randInd];
 	posY = y[randInd];
 }
+
 void Enemy::render(){
 	gEnemyTexture.render(posX,posY);
 }
+
 bool init(){
 	//Initialization flag
 	bool success = true;
@@ -1103,16 +1184,17 @@ bool loadMedia(){
 		printf("Failed to load ostrich font! SDL_ttf Error: %s\n", TTF_GetError());
 		success = false;
 	}
-	//load tiles
+	
+	//Load sprites
 	if(!gSpriteSheet.loadFromFile("Assets/terrain.png")){
 		printf("Failed to load terrain sprite sheet!\n");
 		success = false;
 	}else{
-		gTiles[GRASS] = new Tile({0, 0, 32, 32}, 0);
-		gTiles[BRICK] = new Tile({32, 0, 32, 32}, 2);
-		gTiles[WATER] = new Tile({64, 0, 32, 32}, 1);
-		gTiles[EMPTY] = new Tile({96, 0, 32, 32}, 3);
+		for(int i = 0; i < TOTAL_TILES; ++i){
+			gTiles[i] = new Tile(i);
+		}
 	}
+	
     //Load power up textures
 	if(!gBombPowerUPTexture.loadFromFile("Assets/bomb.png")){
 		printf("Failed to load bomb texture!\n");
@@ -1202,6 +1284,7 @@ bool checkCollision(Circle& c1, SDL_Rect r){
     //If the shapes have not collided
     return false;
 }
+
 void getGrassTilesPos(){
 	for(int i = 0; i < SCREEN_WIDTH; i+=Tile::WIDTH){
 		for(int j = 0; j < PLAYFIELD_HEIGHT; j+=Tile::HEIGHT){
@@ -1212,6 +1295,7 @@ void getGrassTilesPos(){
 		}
 	}
 }
+
 void close(){
 	//Free loaded images
 	gPauseTexture.free();
