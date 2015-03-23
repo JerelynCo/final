@@ -1,7 +1,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
-
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -176,7 +175,6 @@ class Map{
 		Tile* tile(int, int);
 		void hit(int, int);
 		void render(int);
-
 };
 
 class Bullet{
@@ -197,14 +195,14 @@ class Bullet{
 };
 
 class Player{    
-		int dir;
-		int lifeXPos;
-		LTexture* playerTex;
-		LTexture* playerLifeTex;
-		Circle collider;
-		SDL_Scancode con[6];
-		
-		void react();
+	int dir;
+	int lifeXPos;
+	LTexture* playerTex;
+	LTexture* playerLifeTex;
+	Circle collider;
+	SDL_Scancode con[6];
+	
+	void react();
 
 	public:
 		static const int WIDTH = 20, HEIGHT = 20;
@@ -420,7 +418,7 @@ int main(int argc, char *args[]) {
 		if(!loadMedia()) {
 			printf("Failed to load media!\n");
 		}else{
-			int levelDuration = 20;
+			int levelDuration = 60;
 			
 			//Main loop flags
 			bool quit = false;
@@ -459,7 +457,7 @@ int main(int argc, char *args[]) {
 
 			int set = 0;
 			bool nextSet = true;
-			int powerUpsTime[NSETS] = {110, 90, 75, 55, 40, 30, 15, 7};
+			int powerUpsTime[NSETS] = {110, 95, 80, 70, 45, 30, 15, 7};
 			int counter = 0;
 
 			//Event handler
@@ -1182,8 +1180,8 @@ bool Bullet::move() {
 }
 
 bool Bullet::move(Uint32 t) {
-	x += 3*cos(dir%4*PI/2);
-	y += 3*sin(dir%4*PI/2);
+	x += VEL*cos(dir%4*PI/2);
+	y += VEL*sin(dir%4*PI/2);
 	SDL_Rect bullet{(int) x, (int) y, WIDTH, HEIGHT};
 	if(checkCollision(gPlayers[0].getCollider(), bullet)) {
         gPlayers[0].life--;
@@ -1260,8 +1258,10 @@ Enemy::Enemy(int p) {
 	posX = xTile[randInd] + WIDTH/2;
 	posY = yTile[randInd] + HEIGHT/2;
 
+	//random path
 	path = type()%4;
 
+	//random velocities
 	vx = type()%2-1;
 	vy = type()%2-1;
 	if(vx==0||vy==0) {vx = 1; vy = 1;}
@@ -1461,7 +1461,6 @@ bool loadMedia() {
 		printf("Failed to load enemy texture!\n");
 		success = false;
 	}
-
 	return success;
 }
 
