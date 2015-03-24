@@ -384,7 +384,8 @@ random_device type;
 bool collisionReady = true;
 
 //Initializes the current level
-int gLevel = 0;
+int gLevel = 0;	//Note: program crashes for some reason if set to 1
+const int LEVELS = 2;	//Number of levels to be created (Still currently 1)
 
 //For resetting the game
 bool reset = false;
@@ -442,7 +443,6 @@ int main(int argc, char *args[]) {
 			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
 
 			//Level initialization
-			const int LEVELS = 1;	//Number of levels to be created (Still currently 1)
 			for(int i = 0; i < LEVELS; ++i) {
 				gLevels.emplace_back();
 			}
@@ -516,7 +516,7 @@ int main(int argc, char *args[]) {
 						}
 					}
 				}
-
+				
 				for(int i = 0; i < gPlayers.size(); ++i) {gPlayers[i].act(state);}
 
 				//Loads new set of Powerups when nextSet flag is set to true (time dependent)
@@ -532,15 +532,12 @@ int main(int argc, char *args[]) {
 				if(!start) {
 					SDL_RenderClear(gRenderer);
 					gMainTexture.render(0,0);
-				}
-
-				else if(paused) {
+				} else if(paused) {
 					SDL_RenderClear(gRenderer);
 					gPauseTexture.render(0,0);
 					disableCon = true;
-				}
-
-                else if(gameOver) {
+				} else if(gameOver) {
+					gLevel = 0;
                     SDL_RenderClear(gRenderer);
                     bool inputPlayerOne = false;
                     //Enable text input
@@ -558,6 +555,7 @@ int main(int argc, char *args[]) {
                             renderText = true;
                         }
                     }
+					
 					if(gPlayers[0].score > gPlayers[1].score) {
 
 
@@ -573,8 +571,7 @@ int main(int argc, char *args[]) {
                         }
                         gWinnerNameTexture.render( 400, 400);
 
-					}
-					else if(gPlayers[1].score > gPlayers[0].score) {
+					} else if(gPlayers[1].score > gPlayers[0].score) {
 
 						winnerScore = gPlayers[1].score;
 						gPlayerTwoWins.render(0,0);
@@ -587,30 +584,22 @@ int main(int argc, char *args[]) {
                             }
                         }
                         gWinnerNameTexture.render( 400, 400);
-                    }
-                    //tie
-                    else if(gPlayers[1].score == gPlayers[0].score) {
+                    } else if(gPlayers[1].score == gPlayers[0].score) { //tie
                         SDL_RenderClear(gRenderer);
                         gameOver = false;
                         gTimer.start();
                         restart();
                     }
-				}
-
-				else if(reset) {
+				} else if(reset) {
 					SDL_RenderClear(gRenderer);
 					if(gPlayers[0].life > gPlayers[1].life) {
 						gPlayers[0].score++;
 						restart();
-					}
-					else if(gPlayers[1].life > gPlayers[0].life) {
+					} else if(gPlayers[1].life > gPlayers[0].life) {
 						gPlayers[1].score++;
 						restart();
 					}
-				}
-
-				else if(!reset) {
-
+				} else if(!reset) {
                     disableCon = false;
 					//Viewports
 					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
@@ -652,10 +641,11 @@ int main(int argc, char *args[]) {
 							reset = true;
 						}
 					}
-
+					
 					if((levelDuration - gTimer.getTicks()/1000) == 0) {gameOver = true;}
 
 					SDL_RenderSetViewport(gRenderer, &playfield);
+					
 					gLevels[gLevel].render(frame);
 
 					for(int i = 0; i < gEnemyBullets.size(); ++i) {
@@ -972,20 +962,24 @@ void Tile::render(int frame, SDL_Rect renderDst) {
 Map::Map() {
 	if(mapReader.is_open()) {
 		string mapName;
-		getline(mapReader, mapName);
+		
+		if(!mapReader.eof()) {
+			while(mapReader.get() != '[') {}
+			getline(mapReader, mapName, ']');
+		}
+		
 		for(int i = 0; i < Map::ROWS; ++i) {
-			for(int j = 0; j < Map::COLS; ++j){
+			for(int j = 0; j < Map::COLS; ++j) {
+				int tileType;
 				if(!mapReader.eof()) {
-					int tileType;
 					mapReader >> tileType;
-					if(tileType < TOTAL_TILES) {tileMap[j][i] = gTiles[tileType];}
-					else {tileMap[j][i] = gTiles[GRASS];}
+					if(tileType < 0 || tileType >= TOTAL_TILES) {tileType = 0;}
 				} else {
-					tileMap[j][i] = gTiles[GRASS];
+					tileType = 0;
 				}
+				tileMap[j][i] = gTiles[tileType];
 			}
 		}
-		cout << mapName << '\t';
 	}
 	
 	t.w = Tile::WIDTH;
@@ -1295,6 +1289,7 @@ void Enemy::shoot() {
 }
 
 int collect = 0;
+
 void Enemy::move(Uint32 t) {
 	switch(path) {
 		//Linear movement
@@ -1641,6 +1636,7 @@ void restart() {
         gPlayers[i].renderLifeTexture();
         gPlayers[i].life = 5;
     }
+	gLevel = (gLevel+1)%LEVELS;
     reset = false;
 }
 
