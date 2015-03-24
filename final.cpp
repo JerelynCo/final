@@ -313,7 +313,6 @@ bool checkCollision(Circle& c1, SDL_Rect r);
 bool checkBombCollide(Circle& player);
 bool checkEnemyCollide(Circle& player, int*);
 bool checkIfEnclosed(SDL_Rect& smallerArea, SDL_Rect& largerArea);
-bool checkIfExposed(SDL_Rect& smallerArea, SDL_Rect& largerArea);
 
 //Gets grass tiles x and y pos and stores in x and y vectors
 void getGrassTilesPos();
@@ -385,7 +384,7 @@ bool collisionReady = true;
 
 //Initializes the current level
 int gLevel = 0;	//Note: program crashes for some reason if set to 1
-const int LEVELS = 2;	//Number of levels to be created (Still currently 1)
+const int LEVELS = 3;	//Number of levels to be created (Now 3)
 
 //For resetting the game
 bool reset = false;
@@ -1546,15 +1545,6 @@ bool checkCollision(Circle& c1, SDL_Rect r) {
 bool checkIfEnclosed(SDL_Rect& smallerArea, SDL_Rect& largerArea) {
 	if(smallerArea.x >= largerArea.x && smallerArea.x+smallerArea.w <= largerArea.x+largerArea.w
 	&& smallerArea.y >= largerArea.y && smallerArea.y+smallerArea.h <= largerArea.y+largerArea.h) {
-		return true;
-	} else {
-		return false;
-	}
-}
-
-bool checkIfExposed(SDL_Rect& smallerArea, SDL_Rect& largerArea) {
-	if(smallerArea.x+smallerArea.w < largerArea.x || smallerArea.x > largerArea.x+largerArea.w
-	|| smallerArea.y+smallerArea.h < largerArea.y || smallerArea.y > largerArea.y+largerArea.h) {
 		return true;
 	} else {
 		return false;
