@@ -203,6 +203,8 @@ class Player{
 		LTexture* playerLifeTex;
 		Circle collider;
 		SDL_Scancode con[6];
+		bool wasPreviouslyOnSlidewalk;	//Used to check entry and exit of SLIDE tile
+		SDL_Rect lastEnteredSlidewalk;
 		
 		void react();
 
@@ -223,7 +225,8 @@ class Player{
 
 		Player(LTexture* texture, int lifeAvailableXPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
-			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb} {};
+			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb},
+			wasPreviouslyOnSlidewalk(false), lastEnteredSlidewalk{0, 0, 0, 0} {};
 
 		void act(const Uint8*);
 		void act(SDL_Scancode);
@@ -309,6 +312,8 @@ bool checkCollision(Circle& c1, Circle& c2);
 bool checkCollision(Circle& c1, SDL_Rect r);
 bool checkBombCollide(Circle& player);
 bool checkEnemyCollide(Circle& player, int*);
+bool checkIfEnclosed(SDL_Rect& smallerArea, SDL_Rect& largerArea);
+bool checkIfExposed(SDL_Rect& smallerArea, SDL_Rect& largerArea);
 
 //Gets grass tiles x and y pos and stores in x and y vectors
 void getGrassTilesPos();
@@ -415,11 +420,11 @@ int main(int argc, char *args[]) {
 	//Start up SDL and create window
 	if(!init()) {
 		printf("Failed to initialize!\n");
-	}else{
+	} else {
 		//Load media
 		if(!loadMedia()) {
 			printf("Failed to load media!\n");
-		}else{
+		} else {
 			int levelDuration = 20;
 			
 			//Main loop flags
@@ -499,7 +504,7 @@ int main(int argc, char *args[]) {
 							if(gTimer.isPaused()) {
 								gTimer.unpause();
 								paused = false;
-							}else{
+							} else {
 								gTimer.pause();
 								paused = true;
 							}
@@ -656,7 +661,7 @@ int main(int argc, char *args[]) {
 					for(int i = 0; i < gEnemyBullets.size(); ++i) {
                         if(gEnemyBullets[i].move(gTimer.getTicks())||gEnemyBullets[i].blanks()) {
                             gEnemyBullets[i].render();
-                        }else{
+                        } else {
                             gEnemyBullets.erase(gEnemyBullets.begin()+i);
                         }
                     }
@@ -684,7 +689,7 @@ int main(int argc, char *args[]) {
                         if(gBullets[i].move()||gBullets[i].blanks()) {
                             gBullets[i].render();
                         }
-                        else{
+                        else {
                             gBullets.erase(gBullets.begin()+i);
                         }
                     }
@@ -695,7 +700,7 @@ int main(int argc, char *args[]) {
                             gBomb[i].renderExplosion();
                             gBomb.erase(gBomb.begin()+i);
                         }
-                        else{
+                        else {
                         	gBomb[i].render();
                         }
                     }
@@ -719,10 +724,10 @@ int main(int argc, char *args[]) {
 					}
 
                     if(gPlayers[0].shieldEnable == true) {gPlayerOneTexture.loadFromFile("Assets/p1_shield.png");}
-                    else{gPlayerOneTexture.loadFromFile("Assets/p1.png");}
+                    else {gPlayerOneTexture.loadFromFile("Assets/p1.png");}
 
                     if(gPlayers[1].shieldEnable == true) {gPlayerTwoTexture.loadFromFile("Assets/p2_shield.png");}
-                    else{gPlayerTwoTexture.loadFromFile("Assets/p2.png");}
+                    else {gPlayerTwoTexture.loadFromFile("Assets/p2.png");}
 				}
 				SDL_RenderPresent(gRenderer);
 				
@@ -760,7 +765,7 @@ bool LTexture::loadFromFile(string path) {
 
 	if(loadedSurface == NULL) {
 		printf("Unable to load image %s! SDL_image Error: %s\n", path.c_str(), IMG_GetError());
-	}else{
+	} else {
 		//Color key image
 		SDL_SetColorKey(loadedSurface, SDL_TRUE, SDL_MapRGB(loadedSurface->format, 0xFF, 0xFF, 0xFF));
 
@@ -769,7 +774,7 @@ bool LTexture::loadFromFile(string path) {
 
 		if(newTexture == NULL) {
 			printf("Unable to create texture from %s! SDL Error: %s\n", path.c_str(), SDL_GetError());
-		}else{
+		} else {
 			//Get image dimensions
 			mWidth = loadedSurface->w;
 			mLength = loadedSurface->h;
@@ -793,12 +798,12 @@ bool LTexture::loadFromRenderedText(string textureText, SDL_Color textColor) {
 	SDL_Surface* textSurface = TTF_RenderText_Solid(gFont, textureText.c_str(), textColor);
 	if(textSurface == NULL) {
 		printf("Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError());
-	}else{
+	} else {
 		//Create texture from surface pixels
 		mTexture = SDL_CreateTextureFromSurface(gRenderer, textSurface);
 		if(mTexture == NULL) {
 			printf("Unable to create texture from rendered text! SDL Error: %s\n", SDL_GetError());
-		}else{
+		} else {
 			//Get image dimensions
 			mWidth = textSurface->w;
 			mLength = textSurface->h;
@@ -930,7 +935,7 @@ Uint32 LTimer::getTicks() {
 		if(mPaused) {
 			//Return the number of ticks when the timer is paused
 			time = mPausedTicks;
-		}else{
+		} else {
 			//Return the current time minus the start time
 			time = SDL_GetTicks()-mStartTicks;
 		}
@@ -966,18 +971,21 @@ void Tile::render(int frame, SDL_Rect renderDst) {
 
 Map::Map() {
 	if(mapReader.is_open()) {
+		string mapName;
+		getline(mapReader, mapName);
 		for(int i = 0; i < Map::ROWS; ++i) {
 			for(int j = 0; j < Map::COLS; ++j){
 				if(!mapReader.eof()) {
 					int tileType;
 					mapReader >> tileType;
 					if(tileType < TOTAL_TILES) {tileMap[j][i] = gTiles[tileType];}
-					else{tileMap[j][i] = gTiles[GRASS];}
-				}else{
+					else {tileMap[j][i] = gTiles[GRASS];}
+				} else {
 					tileMap[j][i] = gTiles[GRASS];
 				}
 			}
 		}
+		cout << mapName << '\t';
 	}
 	
 	t.w = Tile::WIDTH;
@@ -988,7 +996,7 @@ Tile* Map::tile(int x, int y) {
 	if(x >= 0 && x < Tile::WIDTH*Map::COLS
 		&& y >= 0 && y < Tile::HEIGHT*Map::ROWS) {
 		return tileMap[x/Tile::WIDTH][y/Tile::HEIGHT];
-	}else{
+	} else {
 		return gTiles[STEEL];
 	}
 }
@@ -1017,6 +1025,7 @@ void Player::act(const Uint8* state) {
 		if(state[con[DOWN]]) {move(0, VEL); dir = SOUTH;}
 		if(state[con[RIGHT]]) {move(VEL, 0); dir = EAST;}
 	}
+
 	react();
 }
 
@@ -1028,14 +1037,25 @@ void Player::act(SDL_Scancode key) {
 }
 
 void Player::react() {
+	SDL_Rect tileBoxOfOrigin = {playerRect.x-playerRect.x%Tile::WIDTH, playerRect.y-playerRect.y%Tile::HEIGHT, Tile::WIDTH, Tile::HEIGHT};
+	
 	if(gLevels[gLevel].tile(playerRect.x, playerRect.y)->getTileType() >= SLIDE_DOWN
-	&& gLevels[gLevel].tile(playerRect.x, playerRect.y)->getTileType() <= SLIDE_RIGHT) {
-		switch((gLevels[gLevel].tile(playerRect.x, playerRect.y)->getDirection()+1)%4) {
+	&& gLevels[gLevel].tile(playerRect.x, playerRect.y)->getTileType() <= SLIDE_RIGHT
+	&& (checkIfEnclosed(playerRect, tileBoxOfOrigin) || wasPreviouslyOnSlidewalk)) {
+		if(checkIfEnclosed(playerRect, tileBoxOfOrigin)) {
+			lastEnteredSlidewalk = tileBoxOfOrigin;
+		}
+		dir = (gLevels[gLevel].tile(lastEnteredSlidewalk.x, lastEnteredSlidewalk.y)->getDirection()+1)%4;
+		wasPreviouslyOnSlidewalk = true;
+		
+		switch(dir) {
 			case SOUTH: move(0, VEL); break;
 			case WEST: move(-VEL, 0); break;
 			case NORTH: move(0, -VEL); break;
 			case EAST: move(VEL, 0); break;
 		}
+	} else if(checkIfEnclosed(playerRect, tileBoxOfOrigin)) {
+		wasPreviouslyOnSlidewalk = false;
 	}
 }
 
@@ -1295,13 +1315,13 @@ void Enemy::move(Uint32 t) {
 		case 2:
 			posX += vx;
 			if(gLevels[gLevel].tile(posX+WIDTH, posY)->getWalkability() > 0) {posY+=vy;}
-			else{posX += vx;}
+			else {posX += vx;}
 			if(gLevels[gLevel].tile(posX+WIDTH, posY+HEIGHT)->getWalkability() > 0) {posX-=vx;}
-			else{posY+=vy;}
+			else {posY+=vy;}
 			if(gLevels[gLevel].tile(posX, posY+HEIGHT)->getWalkability() > 0) {posY-=vy;}
-			else{posX-=vx;}
+			else {posX-=vx;}
 			if(gLevels[gLevel].tile(posX, posY)->getWalkability() > 0) {posX+=vx;}
-			else{posY-=vy;}
+			else {posY-=vy;}
 			shiftColliders();
 			break;
 		//Static
@@ -1330,7 +1350,7 @@ void Enemy::hit() {
 			vy = -1*vy;
 			collisionReady = false;
 		}
-		else{collisionReady = true;}
+		else {collisionReady = true;}
 	}
 }
 
@@ -1351,7 +1371,7 @@ bool init() {
 	if(SDL_Init(SDL_INIT_VIDEO) < 0) {
 		printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
 		success = false;
-	}else{
+	} else {
 		//Set texture filtering to linear
 		if(!SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1")) {
 			printf("Warning: Linear texture filtering not enabled!");
@@ -1361,13 +1381,13 @@ bool init() {
 		if(gWindow == NULL) {
 			printf("Window could not be created! SDL Error: %s\n", SDL_GetError());
 			success = false;
-		}else{
+		} else {
 			//Create renderer for window
 			gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 			if(gRenderer == NULL) {
 				printf("Renderer could not be created! SDL Error: %s\n", SDL_GetError());
 				success = false;
-			}else{
+			} else {
 				//Initialize renderer color
 				SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
 				//Initialize PNG loading
@@ -1420,7 +1440,7 @@ bool loadMedia() {
 	if(!gSpriteSheet.loadFromFile("Assets/terrain.png")) {
 		printf("Failed to load terrain sprite sheet!\n");
 		success = false;
-	}else{
+	} else {
 		for(int i = 0; i < TOTAL_TILES; ++i) {
 			gTiles[i] = new Tile(i);
 		}
@@ -1484,7 +1504,7 @@ bool checkEnemyCollide(Circle& player, int* life) {
         	collisionReady = false;
         	return true;
         }
-        else{collisionReady = true;}
+        else {collisionReady = true;}
     }
     return false;
 }
@@ -1505,7 +1525,7 @@ bool checkCollision(Circle& c1, SDL_Rect r) {
     else if(c1.x > r.x + r.w) {
         cX = r.x + r.w;
     }
-    else{
+    else {
         cX = c1.x;
     }
     //Find closest y offset
@@ -1515,7 +1535,7 @@ bool checkCollision(Circle& c1, SDL_Rect r) {
     else if(c1.y > r.y + r.h) {
         cY = r.y + r.h;
     }
-    else{
+    else {
         cY = c1.y;
     }
 
@@ -1526,6 +1546,24 @@ bool checkCollision(Circle& c1, SDL_Rect r) {
     }
     //If the shapes have not collided
     return false;
+}
+
+bool checkIfEnclosed(SDL_Rect& smallerArea, SDL_Rect& largerArea) {
+	if(smallerArea.x >= largerArea.x && smallerArea.x+smallerArea.w <= largerArea.x+largerArea.w
+	&& smallerArea.y >= largerArea.y && smallerArea.y+smallerArea.h <= largerArea.y+largerArea.h) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
+bool checkIfExposed(SDL_Rect& smallerArea, SDL_Rect& largerArea) {
+	if(smallerArea.x+smallerArea.w < largerArea.x || smallerArea.x > largerArea.x+largerArea.w
+	|| smallerArea.y+smallerArea.h < largerArea.y || smallerArea.y > largerArea.y+largerArea.h) {
+		return true;
+	} else {
+		return false;
+	}
 }
 
 void getGrassTilesPos() {
