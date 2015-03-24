@@ -195,14 +195,17 @@ class Bullet{
 };
 
 class Player{    
-	int dir;
-	int lifeXPos;
-	LTexture* playerTex;
-	LTexture* playerLifeTex;
-	Circle collider;
-	SDL_Scancode con[6];
-	
-	void react();
+
+		int dir;
+		int lifeXPos;
+		LTexture* playerTex;
+		LTexture* playerLifeTex;
+		Circle collider;
+		SDL_Scancode con[6];
+		bool wasPreviouslyOnSlidewalk;	//Used to check entry and exit of SLIDE tile
+		SDL_Rect lastEnteredSlidewalk;
+		
+		void react();
 
 	public:
 		static const int WIDTH = 20, HEIGHT = 20;
@@ -222,7 +225,8 @@ class Player{
 
 		Player(LTexture* texture, int lifeAvailableXPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
-			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb}, collisionReady(true) {};
+			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb},
+			wasPreviouslyOnSlidewalk(false), lastEnteredSlidewalk{0, 0, 0, 0} {};
 
 		void act(const Uint8*);
 		void act(SDL_Scancode);
@@ -312,6 +316,7 @@ bool checkCollision(Circle& c1, Circle& c2);
 bool checkCollision(Circle& c1, SDL_Rect r);
 bool checkBombCollide(Circle& player);
 bool checkEnemyCollide(Circle& player, int*, bool collisionReady);
+bool checkIfEnclosed(SDL_Rect& smallerArea, SDL_Rect& largerArea);
 
 //Gets grass tiles x and y pos and stores in x and y vectors
 void getGrassTilesPos();
@@ -379,7 +384,8 @@ vector<int> yTile;
 random_device type;
 
 //Initializes the current level
-int gLevel = 0;
+int gLevel = 0;	//Note: program crashes for some reason if set to 1
+const int LEVELS = 3;	//Number of levels to be created (Now 3)
 
 //For resetting the game
 bool reset = false;
@@ -418,11 +424,12 @@ int main(int argc, char *args[]) {
 	//Start up SDL and create window
 	if(!init()) {
 		printf("Failed to initialize!\n");
-	}else{
+	} else {
 		//Load media
 		if(!loadMedia()) {
 			printf("Failed to load media!\n");
-		}else{
+		}
+		else{
 			int levelDuration = 60;
 
 			//Main loop flags
@@ -440,8 +447,9 @@ int main(int argc, char *args[]) {
 			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
 
 			//Level initialization
-			const int LEVELS = 1;	//Number of levels to be created (Still currently 1)
-			for(int i = 0; i < LEVELS; ++i) {gLevels.emplace_back();}
+			for(int i = 0; i < LEVELS; ++i) {
+				gLevels.emplace_back();
+			}
 
 			getGrassTilesPos();
 
@@ -498,7 +506,7 @@ int main(int argc, char *args[]) {
 							if(gTimer.isPaused()) {
 								gTimer.unpause();
 								paused = false;
-							}else{
+							} else {
 								gTimer.pause();
 								paused = true;
 							}
@@ -510,7 +518,7 @@ int main(int argc, char *args[]) {
 						}
 					}
 				}
-
+				
 				for(int i = 0; i < gPlayers.size(); ++i) {gPlayers[i].act(state);}
 
 				//Loads new set of Powerups when nextSet flag is set to true (time dependent)
@@ -526,15 +534,12 @@ int main(int argc, char *args[]) {
 				if(!start) {
 					SDL_RenderClear(gRenderer);
 					gMainTexture.render(0,0);
-				}
-
-				else if(paused) {
+				} else if(paused) {
 					SDL_RenderClear(gRenderer);
 					gPauseTexture.render(0,0);
 					disableCon = true;
-				}
-
-                else if(gameOver) {
+				} else if(gameOver) {
+					gLevel = 0;
                     SDL_RenderClear(gRenderer);
                     bool inputPlayerOne = false;
                     //Enable text input
@@ -552,6 +557,7 @@ int main(int argc, char *args[]) {
                             renderText = true;
                         }
                     }
+					
 					if(gPlayers[0].score > gPlayers[1].score) {
 						winnerScore = gPlayers[0].score;
 						gPlayerOneWins.render(0,0);
@@ -564,8 +570,8 @@ int main(int argc, char *args[]) {
                             }
                         }
                         gWinnerNameTexture.render( 400, 400);
-					}
-					else if(gPlayers[1].score > gPlayers[0].score) {
+
+					} else if(gPlayers[1].score > gPlayers[0].score) {
 						winnerScore = gPlayers[1].score;
 						gPlayerTwoWins.render(0,0);
 
@@ -577,30 +583,22 @@ int main(int argc, char *args[]) {
                             }
                         }
                         gWinnerNameTexture.render( 400, 400);
-                    }
-                    //tie
-                    else if(gPlayers[1].score == gPlayers[0].score) {
+                    } else if(gPlayers[1].score == gPlayers[0].score) { //tie
                         SDL_RenderClear(gRenderer);
                         gameOver = false;
                         gTimer.start();
                         restart();
                     }
-				}
-
-				else if(reset) {
+				} else if(reset) {
 					SDL_RenderClear(gRenderer);
 					if(gPlayers[0].life > gPlayers[1].life) {
 						gPlayers[0].score++;
 						restart();
-					}
-					else if(gPlayers[1].life > gPlayers[0].life) {
+					} else if(gPlayers[1].life > gPlayers[0].life) {
 						gPlayers[1].score++;
 						restart();
 					}
-				}
-
-				else if(!reset) {
-
+				} else if(!reset) {
                     disableCon = false;
 					//Viewports
 					SDL_Rect scoreboard = {0, 0, SCREEN_WIDTH, SCOREBOARD_HEIGHT};
@@ -642,16 +640,17 @@ int main(int argc, char *args[]) {
 							reset = true;
 						}
 					}
-
+					
 					if((levelDuration - gTimer.getTicks()/1000) == 0) {gameOver = true;}
 
 					SDL_RenderSetViewport(gRenderer, &playfield);
+					
 					gLevels[gLevel].render(frame);
 
 					for(int i = 0; i < gEnemyBullets.size(); ++i) {
                         if(gEnemyBullets[i].move(gTimer.getTicks())||gEnemyBullets[i].blanks()) {
                             gEnemyBullets[i].render();
-                        }else{
+                        } else {
                             gEnemyBullets.erase(gEnemyBullets.begin()+i);
                         }
                     }
@@ -679,7 +678,7 @@ int main(int argc, char *args[]) {
                         if(gBullets[i].move()||gBullets[i].blanks()) {
                             gBullets[i].render();
                         }
-                        else{
+                        else {
                             gBullets.erase(gBullets.begin()+i);
                         }
                     }
@@ -690,7 +689,7 @@ int main(int argc, char *args[]) {
                             gBomb[i].renderExplosion();
                             gBomb.erase(gBomb.begin()+i);
                         }
-                        else{
+                        else {
                         	gBomb[i].render();
                         }
                     }
@@ -714,10 +713,10 @@ int main(int argc, char *args[]) {
 					}
 
                     if(gPlayers[0].shieldEnable == true) {gPlayerOneTexture.loadFromFile("Assets/p1_shield.png");}
-                    else{gPlayerOneTexture.loadFromFile("Assets/p1.png");}
+                    else {gPlayerOneTexture.loadFromFile("Assets/p1.png");}
 
                     if(gPlayers[1].shieldEnable == true) {gPlayerTwoTexture.loadFromFile("Assets/p2_shield.png");}
-                    else{gPlayerTwoTexture.loadFromFile("Assets/p2.png");}
+                    else {gPlayerTwoTexture.loadFromFile("Assets/p2.png");}
 				}
 				SDL_RenderPresent(gRenderer);
 				
@@ -755,7 +754,7 @@ bool LTexture::loadFromFile(string path) {
 
 	if(loadedSurface == NULL) {
 		printf("Unable to load image %s! SDL_image Error: %s\n", path.c_str(), IMG_GetError());
-	}else{
+	} else {
 		//Color key image
 		SDL_SetColorKey(loadedSurface, SDL_TRUE, SDL_MapRGB(loadedSurface->format, 0xFF, 0xFF, 0xFF));
 
@@ -764,7 +763,7 @@ bool LTexture::loadFromFile(string path) {
 
 		if(newTexture == NULL) {
 			printf("Unable to create texture from %s! SDL Error: %s\n", path.c_str(), SDL_GetError());
-		}else{
+		} else {
 			//Get image dimensions
 			mWidth = loadedSurface->w;
 			mLength = loadedSurface->h;
@@ -788,12 +787,12 @@ bool LTexture::loadFromRenderedText(string textureText, SDL_Color textColor) {
 	SDL_Surface* textSurface = TTF_RenderText_Solid(gFont, textureText.c_str(), textColor);
 	if(textSurface == NULL) {
 		printf("Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError());
-	}else{
+	} else {
 		//Create texture from surface pixels
 		mTexture = SDL_CreateTextureFromSurface(gRenderer, textSurface);
 		if(mTexture == NULL) {
 			printf("Unable to create texture from rendered text! SDL Error: %s\n", SDL_GetError());
-		}else{
+		} else {
 			//Get image dimensions
 			mWidth = textSurface->w;
 			mLength = textSurface->h;
@@ -924,7 +923,7 @@ Uint32 LTimer::getTicks() {
 		if(mPaused) {
 			//Return the number of ticks when the timer is paused
 			time = mPausedTicks;
-		}else{
+		} else {
 			//Return the current time minus the start time
 			time = SDL_GetTicks()-mStartTicks;
 		}
@@ -960,16 +959,23 @@ void Tile::render(int frame, SDL_Rect renderDst) {
 
 Map::Map() {
 	if(mapReader.is_open()) {
+		string mapName;
+		
+		if(!mapReader.eof()) {
+			while(mapReader.get() != '[') {}
+			getline(mapReader, mapName, ']');
+		}
+		
 		for(int i = 0; i < Map::ROWS; ++i) {
-			for(int j = 0; j < Map::COLS; ++j){
+			for(int j = 0; j < Map::COLS; ++j) {
+				int tileType;
 				if(!mapReader.eof()) {
-					int tileType;
 					mapReader >> tileType;
-					if(tileType < TOTAL_TILES) {tileMap[j][i] = gTiles[tileType];}
-					else{tileMap[j][i] = gTiles[GRASS];}
-				}else{
-					tileMap[j][i] = gTiles[GRASS];
+					if(tileType < 0 || tileType >= TOTAL_TILES) {tileType = 0;}
+				} else {
+					tileType = 0;
 				}
+				tileMap[j][i] = gTiles[tileType];
 			}
 		}
 	}
@@ -982,7 +988,7 @@ Tile* Map::tile(int x, int y) {
 	if(x >= 0 && x < Tile::WIDTH*Map::COLS
 		&& y >= 0 && y < Tile::HEIGHT*Map::ROWS) {
 		return tileMap[x/Tile::WIDTH][y/Tile::HEIGHT];
-	}else{
+	} else {
 		return gTiles[STEEL];
 	}
 }
@@ -1011,6 +1017,7 @@ void Player::act(const Uint8* state) {
 		if(state[con[DOWN]]) {move(0, VEL); dir = SOUTH;}
 		if(state[con[RIGHT]]) {move(VEL, 0); dir = EAST;}
 	}
+
 	react();
 }
 
@@ -1022,14 +1029,25 @@ void Player::act(SDL_Scancode key) {
 }
 
 void Player::react() {
+	SDL_Rect tileBoxOfOrigin = {playerRect.x-playerRect.x%Tile::WIDTH, playerRect.y-playerRect.y%Tile::HEIGHT, Tile::WIDTH, Tile::HEIGHT};
+	
 	if(gLevels[gLevel].tile(playerRect.x, playerRect.y)->getTileType() >= SLIDE_DOWN
-	&& gLevels[gLevel].tile(playerRect.x, playerRect.y)->getTileType() <= SLIDE_RIGHT) {
-		switch((gLevels[gLevel].tile(playerRect.x, playerRect.y)->getDirection()+1)%4) {
+	&& gLevels[gLevel].tile(playerRect.x, playerRect.y)->getTileType() <= SLIDE_RIGHT
+	&& (checkIfEnclosed(playerRect, tileBoxOfOrigin) || wasPreviouslyOnSlidewalk)) {
+		if(checkIfEnclosed(playerRect, tileBoxOfOrigin)) {
+			lastEnteredSlidewalk = tileBoxOfOrigin;
+		}
+		dir = (gLevels[gLevel].tile(lastEnteredSlidewalk.x, lastEnteredSlidewalk.y)->getDirection()+1)%4;
+		wasPreviouslyOnSlidewalk = true;
+		
+		switch(dir) {
 			case SOUTH: move(0, VEL); break;
 			case WEST: move(-VEL, 0); break;
 			case NORTH: move(0, -VEL); break;
 			case EAST: move(VEL, 0); break;
 		}
+	} else if(checkIfEnclosed(playerRect, tileBoxOfOrigin)) {
+		wasPreviouslyOnSlidewalk = false;
 	}
 }
 
@@ -1256,7 +1274,7 @@ Enemy::Enemy() {
 	posY = yTile[randInd] + HEIGHT/2;
 
 	//random path
-	path = type()%4;
+	path = type()%3;
 	if(type()%2 == 1){initDir = true;}
 	else{initDir = false;}
 
@@ -1285,29 +1303,30 @@ void Enemy::move(Uint32 t) {
 			shiftColliders();
 			break;
 		//Circular
-		case 1:
+/*		case 1:
 			posX += 5*cos(PI*t/1000);
 			posY += 5*sin(PI*t/1000);
 			shiftColliders();
-			break;
+			break;*/
 		//Searcher
-		case 2:
+		case 1:
 			if(initDir){posX += vx;}
 			else{posX -= vx;}
 			if(gLevels[gLevel].tile(posX+WIDTH, posY)->getWalkability() > 0) {posY+=vy;}
-			else{posX += vx;}
+			else {posX += vx;}
 			if(gLevels[gLevel].tile(posX+WIDTH, posY+HEIGHT)->getWalkability() > 0) {posX-=vx;}
-			else{posY+=vy;}
+			else {posY+=vy;}
 			if(gLevels[gLevel].tile(posX, posY+HEIGHT)->getWalkability() > 0) {posY-=vy;}
-			else{posX-=vx;}
+			else {posX-=vx;}
 			if(gLevels[gLevel].tile(posX, posY)->getWalkability() > 0) {posX+=vx;}
 			else{posY-=vy;}
 			if(posX==0||posX+WIDTH==SCREEN_WIDTH){vx=-1*vx;};
 			if(posY==0||posY+HEIGHT==PLAYFIELD_HEIGHT){vy=-1*vy;};
+
 			shiftColliders();
 			break;
 		//Static
-		case 3:
+		case 2:
 			if(frame % 10 ==0) {shoot();}
 	}
 	hit();
@@ -1332,7 +1351,7 @@ void Enemy::hit() {
 			}
 			collisionReady = false;	
 		}
-		else{collisionReady = true;}
+		else {collisionReady = true;}
 	}
 }
 
@@ -1353,7 +1372,7 @@ bool init() {
 	if(SDL_Init(SDL_INIT_VIDEO) < 0) {
 		printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
 		success = false;
-	}else{
+	} else {
 		//Set texture filtering to linear
 		if(!SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1")) {
 			printf("Warning: Linear texture filtering not enabled!");
@@ -1363,13 +1382,13 @@ bool init() {
 		if(gWindow == NULL) {
 			printf("Window could not be created! SDL Error: %s\n", SDL_GetError());
 			success = false;
-		}else{
+		} else {
 			//Create renderer for window
 			gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 			if(gRenderer == NULL) {
 				printf("Renderer could not be created! SDL Error: %s\n", SDL_GetError());
 				success = false;
-			}else{
+			} else {
 				//Initialize renderer color
 				SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
 				//Initialize PNG loading
@@ -1422,7 +1441,7 @@ bool loadMedia() {
 	if(!gSpriteSheet.loadFromFile("Assets/terrain.png")) {
 		printf("Failed to load terrain sprite sheet!\n");
 		success = false;
-	}else{
+	} else {
 		for(int i = 0; i < TOTAL_TILES; ++i) {
 			gTiles[i] = new Tile(i);
 		}
@@ -1485,7 +1504,7 @@ bool checkEnemyCollide(Circle& player, int* life, bool collisionReady) {
         	collisionReady = false;
         	return true;
         }
-        else{collisionReady = true;}
+        else {collisionReady = true;}
     }
     return false;
 }
@@ -1513,6 +1532,15 @@ bool checkCollision(Circle& c1, SDL_Rect r) {
         return true;
     }
     return false;
+}
+
+bool checkIfEnclosed(SDL_Rect& smallerArea, SDL_Rect& largerArea) {
+	if(smallerArea.x >= largerArea.x && smallerArea.x+smallerArea.w <= largerArea.x+largerArea.w
+	&& smallerArea.y >= largerArea.y && smallerArea.y+smallerArea.h <= largerArea.y+largerArea.h) {
+		return true;
+	} else {
+		return false;
+	}
 }
 
 void getGrassTilesPos() {
@@ -1590,6 +1618,7 @@ void restart() {
         gPlayers[i].renderLifeTexture();
         gPlayers[i].life = 5;
     }
+	gLevel = (gLevel+1)%LEVELS;
     reset = false;
 }
 

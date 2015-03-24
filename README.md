@@ -31,6 +31,6 @@
 <h3>Mechanics</h3>
 <p>The player with the greater number of sets won, wins. </p>
 
-<h5>See project specifications here: [Google docs](https://docs.google.com/document/d/16q05iDh-MLStJEJh-Iw0zrEE1JaBTjyIdj_lzreLKh8/edit)</h5>
+<h5>See project specifications here: [Google docs] (https://docs.google.com/document/d/16q05iDh-MLStJEJh-Iw0zrEE1JaBTjyIdj_lzreLKh8/edit)</h5>
 
 <h6>Developers: Jerelyn Co, Charles Edward Lee, and Marion Ivan Tan </h6>
