@@ -35,7 +35,7 @@ enum Controls{
 };
 
 enum PowerUps{
-	LIFE, BOMB, SHIELD, BULLETUPGRADE
+	LIFE, BOMB, SHIELD, BULLETUPGRADE, SPEEDUP
 };
 
 struct Circle{
@@ -196,26 +196,26 @@ class Bullet{
 
 class Player{    
 
-		int dir;
-		int lifeXPos;
-		LTexture* playerTex;
-		LTexture* playerLifeTex;
-		Circle collider;
-		SDL_Scancode con[6];
-		bool wasPreviouslyOnSlidewalk;	//Used to check entry and exit of SLIDE tile
-		SDL_Rect lastEnteredSlidewalk;
-		
-		void react();
+	int dir;
+	int lifeXPos;
+	LTexture* playerTex;
+	LTexture* playerLifeTex;
+	Circle collider;
+	SDL_Scancode con[6];
+	bool wasPreviouslyOnSlidewalk;	//Used to check entry and exit of SLIDE tile
+	SDL_Rect lastEnteredSlidewalk;
+	
+	void react();
 
 	public:
 		static const int WIDTH = 20, HEIGHT = 20;
-		static const int VEL = 2;
 		static const int SHIELD_DURATION = 10;
 		static const int BOMB_DURATION = 50;
 		SDL_Rect playerRect;
 
 		int score = 0;
 		int life = 5;
+		int vel = 2;
         bool shieldEnable;
         bool bulletUpEnable;
     	bool bombEnable;
@@ -348,6 +348,7 @@ LTexture gBombPowerUPTexture;
 LTexture gShieldTexture;
 LTexture gLifeTexture;
 LTexture gBulletUpgradeTexture;
+LTexture gSpeedUpTexture;
 
 LTexture gPlayer1ScoreTexture;
 LTexture gPlayer2ScoreTexture;
@@ -459,12 +460,12 @@ int main(int argc, char *args[]) {
 
 			//Power ups variables
 			static const int NSETS = 8;
-			static const int NPOWERUPS = 4;
+			static const int NPOWERUPS = 5;
 			static const int DSPLYTIMEPWRUP = 10;
 
-            //LIFE, BOMB, SHIELD, BULLETUPGRADE
-			static const int powerUpsSet[NSETS][NPOWERUPS] = {{0, 2, 0, 1}, {0, 2, 0, 0}, {2, 0, 1, 0}, {1, 0, 2, 0}, {0, 0, 0, 2}, {1, 3, 0, 1}, {0, 0, 1, 1}, {3, 0, 0,1}};
-			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombPowerUPTexture, gShieldTexture, gBulletUpgradeTexture};
+            //LIFE, BOMB, SHIELD, BULLETUPGRADE, SPEEDUP
+			static const int powerUpsSet[NSETS][NPOWERUPS] = {{0, 2, 0, 1, 2}, {0, 2, 0, 0, 1}, {2, 0, 1, 0, 1}, {1, 0, 2, 0, 2}, {0, 0, 0, 2, 2}, {1, 3, 0, 1, 1}, {0, 0, 1, 1, 2}, {3, 0, 0,1, 2}};
+			LTexture powerUpsTex[NPOWERUPS] = {gLifeTexture, gBombPowerUPTexture, gShieldTexture, gBulletUpgradeTexture, gSpeedUpTexture};
 
 			int set = 0;
 			bool nextSet = true;
@@ -1012,10 +1013,10 @@ void Map::render(int frame) {
 
 void Player::act(const Uint8* state) {
     if(!disableCon) {
-		if(state[con[UP]]) {move(0, -VEL); dir = NORTH;}
-		if(state[con[LEFT]]) {move(-VEL, 0); dir = WEST;}
-		if(state[con[DOWN]]) {move(0, VEL); dir = SOUTH;}
-		if(state[con[RIGHT]]) {move(VEL, 0); dir = EAST;}
+		if(state[con[UP]]) {move(0, -vel); dir = NORTH;}
+		if(state[con[LEFT]]) {move(-vel, 0); dir = WEST;}
+		if(state[con[DOWN]]) {move(0, vel); dir = SOUTH;}
+		if(state[con[RIGHT]]) {move(vel, 0); dir = EAST;}
 	}
 
 	react();
@@ -1041,10 +1042,10 @@ void Player::react() {
 		wasPreviouslyOnSlidewalk = true;
 		
 		switch(dir) {
-			case SOUTH: move(0, VEL); break;
-			case WEST: move(-VEL, 0); break;
-			case NORTH: move(0, -VEL); break;
-			case EAST: move(VEL, 0); break;
+			case SOUTH: move(0, vel); break;
+			case WEST: move(-vel, 0); break;
+			case NORTH: move(0, -vel); break;
+			case EAST: move(vel, 0); break;
 		}
 	} else if(checkIfEnclosed(playerRect, tileBoxOfOrigin)) {
 		wasPreviouslyOnSlidewalk = false;
@@ -1126,7 +1127,6 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect) {
 		case LIFE:
 			printf("life\n");
 			if(life <= 7)life++;
-
 			break;
 		case BOMB:
             printf("bomb\n");
@@ -1141,6 +1141,10 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect) {
 		case BULLETUPGRADE:
 			printf("bullet upgraded\n");
             bulletUpEnable = true;
+			break;
+		case SPEEDUP:
+			printf("speedup\n");
+            vel++;
 			break;
 	}
 }
@@ -1472,6 +1476,10 @@ bool loadMedia() {
 		printf("Failed to load bulletUpgrade texture!\n");
 		success = false;
 	}
+	if(!gSpeedUpTexture.loadFromFile("Assets/speed.png")) {
+		printf("Failed to load speed texture!\n");
+		success = false;
+	}
 	//Load players' life available image
 	if(!gLifeAvailableTexture.loadFromFile("Assets/lifeAvailable.png")) {
 		printf("Failed to load life available texture!\n");
@@ -1635,6 +1643,7 @@ void close() {
 	gShieldTexture.free();
 	gLifeTexture.free();
 	gBulletUpgradeTexture.free();
+	gSpeedUpTexture.free();
 
 	gBombTexture.free();
 	gExplosionTexture.free();
