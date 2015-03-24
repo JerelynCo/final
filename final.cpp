@@ -216,12 +216,13 @@ class Player{
         bool shieldEnable;
         bool bulletUpEnable;
     	bool bombEnable;
+    	bool collisionReady;
         LTimer shieldTimer;
         LTimer bombTimer;
 
 		Player(LTexture* texture, int lifeAvailableXPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
-			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb} {};
+			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb}, collisionReady(true) {};
 
 		void act(const Uint8*);
 		void act(SDL_Scancode);
@@ -234,6 +235,7 @@ class Player{
 		void activatePowerUp(int id, SDL_Rect& Rect);
 		void placeBomb();
 		void shoot();
+
 };
 
 class PowerUp{
@@ -279,12 +281,15 @@ class Enemy{
 	public:
 		static const int WIDTH = 16, HEIGHT = 16;
 		int posX, posY, angle, vx, vy, path;
+		bool initDir;
 
-		Enemy(int p);
+		Enemy();
 		Circle& getCollider();
 		void shiftColliders();
 		void shoot();
 		void move(Uint32 t);
+		//Flag for enemy - player collision
+		bool collisionReady;
 		void hit();
 		void render();
 };
@@ -302,11 +307,11 @@ bool init();
 //Loads media
 bool loadMedia();
 
-//Checks collision between c1 and c2
+//Collision checkers
 bool checkCollision(Circle& c1, Circle& c2);
 bool checkCollision(Circle& c1, SDL_Rect r);
 bool checkBombCollide(Circle& player);
-bool checkEnemyCollide(Circle& player, int*);
+bool checkEnemyCollide(Circle& player, int*, bool collisionReady);
 
 //Gets grass tiles x and y pos and stores in x and y vectors
 void getGrassTilesPos();
@@ -373,9 +378,6 @@ vector<int> yTile;
 //Rand device
 random_device type;
 
-//Flag for enemy - player collision
-bool collisionReady = true;
-
 //Initializes the current level
 int gLevel = 0;
 
@@ -384,6 +386,9 @@ bool reset = false;
 
 //For pausing the game
 bool disableCon = false;
+
+//frame counter
+int frame = 0;
 
 //For reading the map layout
 ifstream mapReader("maps.txt");
@@ -419,7 +424,7 @@ int main(int argc, char *args[]) {
 			printf("Failed to load media!\n");
 		}else{
 			int levelDuration = 60;
-			
+
 			//Main loop flags
 			bool quit = false;
 			bool start = false;
@@ -431,14 +436,12 @@ int main(int argc, char *args[]) {
 			bool enableBulletUp = false;
 			bool enableShieldUp = false;
 			int p1LifeAvailablePosX = 60;
-			int p2LifeAvailablePosX= SCREEN_WIDTH-SCREEN_WIDTH/6;
+			int p2LifeAvailablePosX = SCREEN_WIDTH-SCREEN_WIDTH/6;
 			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
 
 			//Level initialization
 			const int LEVELS = 1;	//Number of levels to be created (Still currently 1)
-			for(int i = 0; i < LEVELS; ++i) {
-				gLevels.emplace_back();
-			}
+			for(int i = 0; i < LEVELS; ++i) {gLevels.emplace_back();}
 
 			getGrassTilesPos();
 
@@ -466,8 +469,6 @@ int main(int argc, char *args[]) {
 
 			//Set text colour as black
 			SDL_Color textColor = {255, 255, 255, 255};
-
-			int frame = 0;
 
 			//In memory text stream
 			stringstream timeText;
@@ -517,7 +518,7 @@ int main(int argc, char *args[]) {
 					for(int i = 0; i < NPOWERUPS; i++) {
 						for(int j = 0; j < powerUpsSet[set][i]; j++) {
 							gPowerUps.emplace_back(&powerUpsTex[i], i);
-							gEnemies.emplace_back(type()%4);
+							gEnemies.emplace_back();
 						}
 					}
 					nextSet = false;
@@ -542,7 +543,7 @@ int main(int argc, char *args[]) {
                         if(event.type == SDL_QUIT) {
                             quit = true;
 					    }
-                        if( event.type == SDL_TEXTINPUT  ) {
+                        if(event.type == SDL_TEXTINPUT) {
                             winnerName += event.text.text;
                             renderText = true;
                         }
@@ -552,8 +553,6 @@ int main(int argc, char *args[]) {
                         }
                     }
 					if(gPlayers[0].score > gPlayers[1].score) {
-
-
 						winnerScore = gPlayers[0].score;
 						gPlayerOneWins.render(0,0);
 
@@ -565,10 +564,8 @@ int main(int argc, char *args[]) {
                             }
                         }
                         gWinnerNameTexture.render( 400, 400);
-
 					}
 					else if(gPlayers[1].score > gPlayers[0].score) {
-
 						winnerScore = gPlayers[1].score;
 						gPlayerTwoWins.render(0,0);
 
@@ -921,7 +918,6 @@ void LTimer::unpause() {
 Uint32 LTimer::getTicks() {
 	//The actual timer time
 	Uint32 time = 0;
-
 	//If the timer is running
 	if(mStarted) {
 		//If the timer is paused
@@ -1047,7 +1043,7 @@ void Player::move(int vx, int vy) {
 	|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->getWalkability() > 0
 	|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
 	|| (checkBombCollide(collider))
-	|| (checkEnemyCollide(collider, &life))
+	|| (checkEnemyCollide(collider, &life, collisionReady))
 	) {
 		playerRect.x -= vx;
 		shiftColliders();
@@ -1062,7 +1058,7 @@ void Player::move(int vx, int vy) {
 	|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT))->getWalkability() > 0
 	|| (checkCollision(gPlayers[0].getCollider(), gPlayers[1].getCollider())) 
 	|| (checkBombCollide(collider))
-	|| (checkEnemyCollide(collider, &life))
+	|| (checkEnemyCollide(collider, &life, collisionReady))
 	) {
 		playerRect.y -= vy;
 		shiftColliders();
@@ -1112,6 +1108,7 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect) {
 		case LIFE:
 			printf("life\n");
 			if(life <= 7)life++;
+
 			break;
 		case BOMB:
             printf("bomb\n");
@@ -1253,13 +1250,15 @@ void Bomb::blowUp(int x, int y) {
     }
 }
 
-Enemy::Enemy(int p) {
+Enemy::Enemy() {
 	int randInd = type()%xTile.size();
 	posX = xTile[randInd] + WIDTH/2;
 	posY = yTile[randInd] + HEIGHT/2;
 
 	//random path
 	path = type()%4;
+	if(type()%2 == 1){initDir = true;}
+	else{initDir = false;}
 
 	//random velocities
 	vx = type()%2-1;
@@ -1268,13 +1267,13 @@ Enemy::Enemy(int p) {
 
 	angle = 0;
 	collider = {posX, posY, WIDTH/2};
+	collisionReady = true;
 }
 
 void Enemy::shoot() {
 	gEnemyBullets.emplace_back(posX+WIDTH/2-1, posY+HEIGHT/2-1, angle);
 }
 
-int collect = 0;
 void Enemy::move(Uint32 t) {
 	switch(path) {
 		//Linear movement
@@ -1288,12 +1287,13 @@ void Enemy::move(Uint32 t) {
 		//Circular
 		case 1:
 			posX += 5*cos(PI*t/1000);
-			posY += 5*sin(PI*(50-t)/1000);
+			posY += 5*sin(PI*t/1000);
 			shiftColliders();
 			break;
 		//Searcher
 		case 2:
-			posX += vx;
+			if(initDir){posX += vx;}
+			else{posX -= vx;}
 			if(gLevels[gLevel].tile(posX+WIDTH, posY)->getWalkability() > 0) {posY+=vy;}
 			else{posX += vx;}
 			if(gLevels[gLevel].tile(posX+WIDTH, posY+HEIGHT)->getWalkability() > 0) {posX-=vx;}
@@ -1302,13 +1302,13 @@ void Enemy::move(Uint32 t) {
 			else{posX-=vx;}
 			if(gLevels[gLevel].tile(posX, posY)->getWalkability() > 0) {posX+=vx;}
 			else{posY-=vy;}
+			if(posX==0||posX+WIDTH==SCREEN_WIDTH){vx=-1*vx;};
+			if(posY==0||posY+HEIGHT==PLAYFIELD_HEIGHT){vy=-1*vy;};
 			shiftColliders();
 			break;
 		//Static
 		case 3:
-			if(collect % 10 ==0) {shoot();}
-			if(collect == 50) {collect = 0;}
-			collect++;
+			if(frame % 10 ==0) {shoot();}
 	}
 	hit();
 }
@@ -1325,10 +1325,12 @@ Circle& Enemy::getCollider() {
 void Enemy::hit() {
 	for(int i = 0; i < gPlayers.size(); i++) {
 		if(checkCollision(gPlayers[i].getCollider(), collider)) {
-			if(collisionReady) {gPlayers[i].life--;}
-			vx = -1*vx;
-			vy = -1*vy;
-			collisionReady = false;
+			if(collisionReady){
+				if(!gPlayers[i].shieldEnable) {gPlayers[i].life--;}
+				vx = -1*vx;
+				vy = -1*vy;
+			}
+			collisionReady = false;	
 		}
 		else{collisionReady = true;}
 	}
@@ -1476,7 +1478,7 @@ bool checkBombCollide(Circle& player) {
     return false;
 }
 
-bool checkEnemyCollide(Circle& player, int* life) {
+bool checkEnemyCollide(Circle& player, int* life, bool collisionReady) {
 	for(int i = 0; i < gEnemies.size(); i++) {
         if(checkCollision(player, gEnemies[i].getCollider())) {
         	if(collisionReady) {*life = *life-1;}
@@ -1498,32 +1500,18 @@ bool checkCollision(Circle& c1, Circle& c2) {
 bool checkCollision(Circle& c1, SDL_Rect r) {
 	//Closest point on collision box
     int cX, cY;
-    if(c1.x < r.x) {
-    	cX = r.x;
-    }
-    else if(c1.x > r.x + r.w) {
-        cX = r.x + r.w;
-    }
-    else{
-        cX = c1.x;
-    }
+    if(c1.x < r.x) {cX = r.x;}
+    else if(c1.x > r.x + r.w) {cX = r.x + r.w;}
+    else{cX = c1.x;}
     //Find closest y offset
-    if(c1.y < r.y) {
-        cY = r.y;
-    }
-    else if(c1.y > r.y + r.h) {
-        cY = r.y + r.h;
-    }
-    else{
-        cY = c1.y;
-    }
+    if(c1.y < r.y) {cY = r.y;}
+    else if(c1.y > r.y + r.h) {cY = r.y + r.h;}
+    else{cY = c1.y;}
 
     //If the closest point is inside the circle
     if(sqrt(pow(cX-c1.x, 2)+pow(cY-c1.y, 2)) < c1.r) {
-        //This box and the circle have collided
         return true;
     }
-    //If the shapes have not collided
     return false;
 }
 
@@ -1627,7 +1615,6 @@ void close() {
 	gEnemyTexture.free();
 
 	gSpriteSheet.free();
-	
 	mapReader.close();
 
 	//Free global font
