@@ -164,6 +164,8 @@ class Tile{
 
 class Map{
 		SDL_Rect t;
+		int p1StartingRow, p1StartingCol;
+		int p2StartingRow, p2StartingCol;
 	
  	public:
 		static const int ROWS = PLAYFIELD_HEIGHT/Tile::HEIGHT, COLS = SCREEN_WIDTH/Tile::WIDTH;
@@ -202,8 +204,6 @@ class Player{
 	LTexture* playerLifeTex;
 	Circle collider;
 	SDL_Scancode con[6];
-	bool wasPreviouslyOnSlidewalk;	//Used to check entry and exit of SLIDE tile
-	SDL_Rect lastEnteredSlidewalk;
 	
 	void react();
 
@@ -225,8 +225,7 @@ class Player{
 
 		Player(LTexture* texture, int lifeAvailableXPos, int x, int y, bool enableBombUp, bool enableBulletUp, bool enableShieldUp, SDL_Scancode up, SDL_Scancode left, SDL_Scancode down, SDL_Scancode right, SDL_Scancode shoot, SDL_Scancode placebomb):
 			playerRect{x, y, texture->getWidth(), texture->getLength()},
-			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb},
-			wasPreviouslyOnSlidewalk(false), lastEnteredSlidewalk{0, 0, 0, 0} {};
+			dir(SOUTH), playerTex(texture), collider{x+WIDTH/2,y+WIDTH/2,WIDTH/2}, bombEnable(enableBombUp), bulletUpEnable(enableBulletUp), shieldEnable(enableShieldUp), lifeXPos(lifeAvailableXPos), con{up, left, down, right, shoot, placebomb} {};
 
 		void act(const Uint8*);
 		void act(SDL_Scancode);
@@ -239,6 +238,8 @@ class Player{
 		void activatePowerUp(int id, SDL_Rect& Rect);
 		void placeBomb();
 		void shoot();
+		
+		void setPosition(int column, int row);
 
 };
 
@@ -394,6 +395,9 @@ bool reset = false;
 //For pausing the game
 bool disableCon = false;
 
+//To determine whether a level has just started or not
+bool gLevelStart = true;
+
 //frame counter
 int frame = 0;
 
@@ -446,17 +450,17 @@ int main(int argc, char *args[]) {
 			int p1LifeAvailablePosX = 60;
 			int p2LifeAvailablePosX = SCREEN_WIDTH-SCREEN_WIDTH/6;
 			int p1_posX = 5, p1_posY = 5, p2_posX = SCREEN_WIDTH-Player::WIDTH-5, p2_posY = PLAYFIELD_HEIGHT-Player::HEIGHT-5;
-
+			
+			//Create players
+			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
+			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosX, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
+			
 			//Level initialization
 			for(int i = 0; i < LEVELS; ++i) {
 				gLevels.emplace_back();
 			}
-
+			
 			getGrassTilesPos();
-
-			//Create players
-			gPlayers.emplace_back(&gPlayerOneTexture, p1LifeAvailablePosX, p1_posX, p1_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_W, SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_C, SDL_SCANCODE_X);
-			gPlayers.emplace_back(&gPlayerTwoTexture, p2LifeAvailablePosX, p2_posX, p2_posY, enableBombUp, enableBulletUp, enableShieldUp, SDL_SCANCODE_I, SDL_SCANCODE_J, SDL_SCANCODE_K, SDL_SCANCODE_L, SDL_SCANCODE_N, SDL_SCANCODE_M);
 
 			//Power ups variables
 			static const int NSETS = 8;
@@ -718,6 +722,7 @@ int main(int argc, char *args[]) {
 
                     if(gPlayers[1].shieldEnable == true) {gPlayerTwoTexture.loadFromFile("Assets/p2_shield.png");}
                     else {gPlayerTwoTexture.loadFromFile("Assets/p2.png");}
+					gLevelStart = false;
 				}
 				SDL_RenderPresent(gRenderer);
 				
@@ -967,6 +972,27 @@ Map::Map() {
 			getline(mapReader, mapName, ']');
 		}
 		
+		if(!mapReader.eof()) {
+			mapReader >> p1StartingCol;
+			mapReader >> p1StartingRow;
+			mapReader >> p2StartingCol;
+			mapReader >> p2StartingRow;
+		} else {
+			p1StartingCol = 0;
+			p1StartingRow = 0;
+			p2StartingCol = COLS-1;
+			p2StartingRow = ROWS-1;
+		}
+		
+		if(p1StartingCol < 0 || p1StartingCol >= COLS || p1StartingRow < 0 || p1StartingRow >= ROWS) {
+			p1StartingCol = 0;
+			p1StartingRow = 0;
+		}
+		if(p2StartingCol < 0 || p2StartingCol >= COLS || p2StartingRow < 0 || p2StartingRow >= ROWS) {
+			p2StartingCol = 0;
+			p2StartingRow = 0;
+		}
+		
 		for(int i = 0; i < Map::ROWS; ++i) {
 			for(int j = 0; j < Map::COLS; ++j) {
 				int tileType;
@@ -1001,6 +1027,11 @@ void Map::hit(int x, int y) {
 }
 
 void Map::render(int frame) {
+	if(gLevelStart) {
+		gPlayers[0].setPosition(p1StartingCol, p1StartingRow);
+		gPlayers[1].setPosition(p2StartingCol, p2StartingRow);
+	}
+	
 	for(int i = 0; i < ROWS; ++i) {
 		for(int j = 0; j < COLS; ++j) {
 			t.x = j*Tile::WIDTH;
@@ -1032,23 +1063,35 @@ void Player::act(SDL_Scancode key) {
 void Player::react() {
 	SDL_Rect tileBoxOfOrigin = {playerRect.x-playerRect.x%Tile::WIDTH, playerRect.y-playerRect.y%Tile::HEIGHT, Tile::WIDTH, Tile::HEIGHT};
 	
-	if(gLevels[gLevel].tile(playerRect.x, playerRect.y)->getTileType() >= SLIDE_DOWN
-	&& gLevels[gLevel].tile(playerRect.x, playerRect.y)->getTileType() <= SLIDE_RIGHT
-	&& (checkIfEnclosed(playerRect, tileBoxOfOrigin) || wasPreviouslyOnSlidewalk)) {
-		if(checkIfEnclosed(playerRect, tileBoxOfOrigin)) {
-			lastEnteredSlidewalk = tileBoxOfOrigin;
+	if((gLevels[gLevel].tile(playerRect.x, playerRect.y)->getTileType() >= SLIDE_DOWN
+	&& gLevels[gLevel].tile(playerRect.x, playerRect.y)->getTileType() <= SLIDE_RIGHT)
+	|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y)->getTileType() >= SLIDE_DOWN
+	&& gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y)->getTileType() <= SLIDE_RIGHT)
+	|| (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT)->getTileType() >= SLIDE_DOWN
+	&& gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT)->getTileType() <= SLIDE_RIGHT)
+	|| (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT)->getTileType() >= SLIDE_DOWN
+	&& gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT)->getTileType() <= SLIDE_RIGHT)) {
+		
+		if(gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y)->getTileType() >= SLIDE_DOWN
+		&& gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y)->getTileType() <= SLIDE_RIGHT) {
+			tileBoxOfOrigin.x = playerRect.x+WIDTH;
+		} else if (gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT)->getTileType() >= SLIDE_DOWN
+		&& gLevels[gLevel].tile(playerRect.x, playerRect.y+HEIGHT)->getTileType() <= SLIDE_RIGHT) {
+			tileBoxOfOrigin.y = playerRect.y+HEIGHT;
+		} else if (gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT)->getTileType() >= SLIDE_DOWN
+		&& gLevels[gLevel].tile(playerRect.x+WIDTH, playerRect.y+HEIGHT)->getTileType() <= SLIDE_RIGHT) {
+			tileBoxOfOrigin.x = playerRect.x+WIDTH;
+			tileBoxOfOrigin.y = playerRect.y+HEIGHT;
 		}
-		dir = (gLevels[gLevel].tile(lastEnteredSlidewalk.x, lastEnteredSlidewalk.y)->getDirection()+1)%4;
-		wasPreviouslyOnSlidewalk = true;
+		
+		dir = (gLevels[gLevel].tile(tileBoxOfOrigin.x, tileBoxOfOrigin.y)->getDirection()+1)%4;
 		
 		switch(dir) {
-			case SOUTH: move(0, vel); break;
-			case WEST: move(-vel, 0); break;
-			case NORTH: move(0, -vel); break;
-			case EAST: move(vel, 0); break;
+			case SOUTH: move(0, vel/2); break;
+			case WEST: move(-vel/2, 0); break;
+			case NORTH: move(0, -vel/2); break;
+			case EAST: move(vel/2, 0); break;
 		}
-	} else if(checkIfEnclosed(playerRect, tileBoxOfOrigin)) {
-		wasPreviouslyOnSlidewalk = false;
 	}
 }
 
@@ -1147,6 +1190,11 @@ void Player::activatePowerUp(int id, SDL_Rect& Rect) {
             vel++;
 			break;
 	}
+}
+
+void Player::setPosition(int column, int row) {
+	playerRect.x = column*Tile::WIDTH+(Tile::WIDTH-WIDTH)/2;
+	playerRect.y = row*Tile::HEIGHT+(Tile::HEIGHT-HEIGHT)/2;
 }
 
 PowerUp::PowerUp(LTexture* texture, int pwrUp_id) {
@@ -1627,6 +1675,7 @@ void restart() {
         gPlayers[i].life = 5;
     }
 	gLevel = (gLevel+1)%LEVELS;
+	gLevelStart = true;
     reset = false;
 }
 
